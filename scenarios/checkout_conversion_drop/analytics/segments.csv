@@ -1,0 +1,8 @@
+segment,checkout_conversion,orders_change_pct,platform
+new_users,0.09,-22,all
+returning_users,0.18,-15,all
+ios_users,0.08,-32,ios
+android_users,0.20,-5,android
+web_users,0.19,-4,web
+power_users,0.21,-8,all
+casual_users,0.07,-28,all

@@ -1,0 +1,7 @@
+step,conversion_rate,users,drop_off_pct
+app_open,1.0,100000,0
+restaurant_view,0.76,76000,24
+add_to_cart,0.41,41000,46
+checkout,0.27,27000,34
+payment,0.14,14000,48
+order_success,0.13,13000,7

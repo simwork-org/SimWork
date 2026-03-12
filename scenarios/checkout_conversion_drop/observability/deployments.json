@@ -1,0 +1,23 @@
+[
+  {
+    "date": "2025-01-10",
+    "service": "payment_service",
+    "change": "Migrated to new payment gateway provider (PayStream v3)",
+    "author": "backend-team",
+    "rollback_available": true
+  },
+  {
+    "date": "2025-01-12",
+    "service": "checkout_service",
+    "change": "Minor CSS fix for checkout button alignment",
+    "author": "frontend-team",
+    "rollback_available": true
+  },
+  {
+    "date": "2025-01-05",
+    "service": "catalog_service",
+    "change": "Added restaurant category filters",
+    "author": "backend-team",
+    "rollback_available": true
+  }
+]

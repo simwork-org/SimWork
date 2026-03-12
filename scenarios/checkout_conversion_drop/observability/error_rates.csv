@@ -1,0 +1,5 @@
+service,week1_error_pct,week2_error_pct,week3_error_pct,week4_error_pct
+payment_service,0.8,1.1,3.2,4.5
+checkout_service,0.3,0.3,0.4,0.4
+catalog_service,0.1,0.1,0.1,0.1
+user_service,0.1,0.1,0.1,0.1

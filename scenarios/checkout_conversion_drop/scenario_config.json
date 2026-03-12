@@ -1,0 +1,16 @@
+{
+  "scenario_id": "checkout_conversion_drop",
+  "title": "Checkout Conversion Drop",
+  "difficulty": "medium",
+  "industry": "food_delivery",
+  "product": "FoodDash",
+  "problem_statement": "Weekly orders have dropped by 18% over the past month. Investigate the issue and propose a recovery plan.",
+  "root_cause": "payment_service_latency",
+  "expected_investigation_path": [
+    "orders_trend",
+    "checkout_funnel",
+    "segment_analysis",
+    "payment_service_latency",
+    "user_payment_feedback"
+  ]
+}

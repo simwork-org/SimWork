@@ -1,0 +1,11 @@
+ticket_id,date,category,issue,platform,priority
+1001,2025-01-16,payment,Payment failed multiple times during checkout,ios,high
+1002,2025-01-17,payment,Unable to complete checkout - payment keeps timing out,ios,high
+1003,2025-01-17,payment,Payment retry not available after failure,ios,medium
+1004,2025-01-18,payment,Order stuck at payment screen for over 30 seconds,ios,high
+1005,2025-01-19,checkout,Checkout process very slow compared to last week,android,medium
+1006,2025-01-19,payment,Payment failed with no error message,ios,high
+1007,2025-01-20,payment,Had to try 4 times before payment went through,ios,medium
+1008,2025-01-21,payment,Payment timeout - gave up and ordered from competitor,ios,high
+1009,2025-01-22,checkout,App freezes during payment processing,ios,critical
+1010,2025-01-22,payment,Cannot pay with credit card anymore,ios,high

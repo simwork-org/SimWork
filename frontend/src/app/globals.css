@@ -1,0 +1,17 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-primary: #10B981;
+  --color-background-light: #f6f6f8;
+  --color-background-dark: #0a0f1a;
+  --font-sans: "Inter", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+body {
+  font-family: "Inter", sans-serif;
+}
+
+.dark {
+  color-scheme: dark;
+}
