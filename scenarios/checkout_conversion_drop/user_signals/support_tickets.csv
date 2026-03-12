@@ -1,0 +1,5 @@
+ticket_id,issue
+1001,payment failed multiple times on iOS checkout
+1002,unable to complete checkout after card authentication
+1003,payment retry not available after failure
+1004,checkout spinner hangs before order confirmation

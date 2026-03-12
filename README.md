@@ -1,53 +1,114 @@
 # SimWork
 
-**SimWork** is a platform that simulates real work environments to evaluate how people investigate problems, make decisions, and execute solutions.
+SimWork is an MVP platform for simulated product investigations. Candidates enter a realistic scenario, question AI teammates inside strict telemetry boundaries, build hypotheses, and submit a final recommendation.
 
-Instead of answering theoretical questions, candidates are placed inside **realistic work scenarios** where they must collaborate with **AI teammates** (analyst, developer, UX researcher, etc.) to diagnose problems and propose solutions.
+The implementation in this repository follows the docs in [`docs/`](./docs), with the current MVP covering:
 
-The goal is to evaluate **how people actually work**, not just how they answer interview questions.
+- FastAPI backend with scenario loading, domain-restricted query routing, LLM orchestration hooks, and SQLite activity logging
+- Next.js frontend using the three stitched UI screens as reusable components
+- Example deterministic scenario in [`scenarios/checkout_conversion_drop`](./scenarios/checkout_conversion_drop)
+- Local fallback response generation when no live LLM provider is reachable
 
----
+## Project Structure
 
-# Why SimWork
+```text
+backend/
+  api/
+  simulation_engine/
+  agent_router/
+  scenario_loader/
+  telemetry_layer/
+  llm_interface/
+  investigation_logger/
 
-Traditional hiring processes rely on:
+frontend/
+scenarios/
+docs/
+```
 
-- theoretical interview questions
-- case studies
-- subjective evaluation
+## Local Setup
 
-These methods often fail to measure **real problem-solving ability in a work environment**.
+1. Copy the environment template.
 
-SimWork changes this by creating **interactive simulations of real work situations**.
+```bash
+cp .env.example .env
+```
 
-Candidates must:
+2. Install backend dependencies with `uv`.
 
-- investigate product metrics
-- ask the right questions
-- collaborate with team members
-- form hypotheses
-- propose solutions
+```bash
+uv sync --dev
+```
 
-This reveals **how they think and operate in real scenarios**.
+3. Install frontend dependencies.
 
----
+```bash
+cd frontend
+npm install
+cd ..
+```
 
-# Core Idea
+4. Start the backend.
 
-Each simulation places the candidate inside a **realistic product problem**.
+```bash
+make backend
+```
 
-Example scenario:
+5. Start the frontend in a second terminal.
 
-> Weekly orders have dropped by 18% over the past month.
+```bash
+cd frontend
+npm run dev
+```
 
-The candidate must investigate the issue by interacting with **AI teammates**.
+Frontend: `http://localhost:3000`  
+Backend API: `http://localhost:8000/api/v1`
 
-Available roles may include:
+## Environment Variables
 
-- Data Analyst
-- UX Researcher
-- Developer
+The backend reads the provider configuration from `.env`:
 
-Each AI teammate provides **partial information**, mimicking real-world knowledge distribution inside teams.
+- `OPENAI_API_KEY`
+- `ANTHROPIC_API_KEY`
+- `DEEPSEEK_API_KEY`
+- `OLLAMA_ENDPOINT`
+- `MODEL_PROVIDER`
+- `MODEL_NAME`
 
-The candidate must combine signals from different sources to identify the **root cause**.
+If a configured provider is unavailable, the MVP falls back to deterministic telemetry summaries so the investigation flow still works locally.
+
+## API Coverage
+
+Implemented endpoints:
+
+- `GET /api/v1/scenarios`
+- `POST /api/v1/sessions/start`
+- `GET /api/v1/sessions/{session_id}/scenario`
+- `POST /api/v1/sessions/{session_id}/query`
+- `POST /api/v1/sessions/{session_id}/hypothesis`
+- `GET /api/v1/sessions/{session_id}/history`
+- `GET /api/v1/sessions/{session_id}/status`
+- `POST /api/v1/sessions/{session_id}/submit`
+
+## Docker
+
+Backend Docker image:
+
+```bash
+docker build -f backend/Dockerfile -t simwork-backend .
+```
+
+Compose setup:
+
+```bash
+docker compose up --build
+```
+
+## Verification
+
+Validated locally with:
+
+```bash
+uv run pytest
+cd frontend && npm run build
+```

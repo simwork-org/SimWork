@@ -1,0 +1,42 @@
+@import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html {
+  background: #101122;
+}
+
+body {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top, rgba(100, 103, 242, 0.12), transparent 28%),
+    linear-gradient(180deg, #0d1020 0%, #101122 48%, #0c1120 100%);
+  color: #e5e7eb;
+}
+
+.material-symbols-outlined {
+  font-family: "Material Symbols Outlined";
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-smoothing: antialiased;
+}
+
+.glass-panel {
+  background: rgba(15, 23, 42, 0.68);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+}

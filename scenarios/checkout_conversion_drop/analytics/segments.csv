@@ -1,0 +1,6 @@
+segment,previous_checkout_conversion,current_checkout_conversion,status
+iOS App,0.19,0.10,critical
+Android,0.18,0.17,normal
+Web,0.21,0.19,normal
+New Users,0.14,0.09,warning
+Returning Users,0.23,0.18,warning
