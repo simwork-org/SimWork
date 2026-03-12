@@ -81,7 +81,7 @@ function BarChart({ chart }: { chart: ChartData }) {
         return (
           <div key={i} className="flex items-center gap-2">
             <span className="text-[9px] text-slate-500 w-24 truncate text-right shrink-0">{label}</span>
-            <div className="flex-1 h-4 bg-slate-800/40 rounded overflow-hidden">
+            <div className="flex-1 h-4 bg-slate-200 dark:bg-slate-800/40 rounded overflow-hidden">
               <div
                 className={`h-full rounded transition-all duration-500 ${isNeg ? "bg-gradient-to-r from-red-500/70 to-red-400/50" : "bg-gradient-to-r from-emerald-500/80 to-emerald-400/60"}`}
                 style={{ width: `${pct}%` }}
@@ -131,7 +131,7 @@ function LineChart({ chart }: { chart: ChartData }) {
         <polygon fill={`url(#${gradId})`} points={area} />
         <polyline fill="none" stroke="#10B981" strokeWidth="2" points={polyline} strokeLinejoin="round" strokeLinecap="round" />
         {points.map((p, i) => (
-          <circle key={i} cx={p.x} cy={p.y} r="3.5" fill="#0A0E1A" stroke="#10B981" strokeWidth="1.5" />
+          <circle key={i} cx={p.x} cy={p.y} r="3.5" fill="white" stroke="#10B981" strokeWidth="1.5" className="dark:fill-[#101122]" />
         ))}
       </svg>
       <div className="flex justify-between px-1">
@@ -176,11 +176,11 @@ function FunnelChart({ chart }: { chart: ChartData }) {
 
 function TableChart({ chart }: { chart: ChartData }) {
   return (
-    <div className="border border-slate-800/50 rounded-lg overflow-hidden">
+    <div className="border border-slate-200 dark:border-slate-700/50 rounded-lg overflow-hidden">
       {chart.labels.map((label, i) => (
-        <div key={i} className={`flex items-center justify-between px-3 py-1.5 ${i % 2 === 0 ? "bg-slate-800/20" : "bg-transparent"}`}>
-          <span className="text-[10px] text-slate-400">{label}</span>
-          <span className="text-[10px] text-slate-200 font-mono font-semibold">
+        <div key={i} className={`flex items-center justify-between px-3 py-1.5 ${i % 2 === 0 ? "bg-slate-100 dark:bg-slate-800/20" : "bg-transparent"}`}>
+          <span className="text-[10px] text-slate-500 dark:text-slate-400">{label}</span>
+          <span className="text-[10px] text-slate-900 dark:text-slate-200 font-mono font-semibold">
             {chart.values[i]?.toLocaleString()}{chart.unit === "%" ? "%" : chart.unit ? ` ${chart.unit}` : ""}
           </span>
         </div>
@@ -224,29 +224,29 @@ function MissionCard() {
       onMouseLeave={() => setOpen(false)}
       onClick={() => setOpen((p) => !p)}
     >
-      <div className="flex items-center gap-3 px-5 py-2 rounded-lg bg-[#161B26] border border-slate-800/60 cursor-pointer hover:border-emerald-800/50 transition-colors">
+      <div className="flex items-center gap-3 px-5 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 cursor-pointer hover:border-emerald-500/50 transition-colors">
         <span className={`material-symbols-outlined text-xl ${ACCENT_TEXT}`}>assignment</span>
         <div className="flex flex-col">
-          <span className="text-sm font-bold text-slate-200">Checkout Conversion Drop</span>
+          <span className="text-sm font-bold text-slate-900 dark:text-slate-200">Checkout Conversion Drop</span>
           <span className="text-[9px] text-slate-500 font-medium">Orders -18% · Find Root Cause · <span className="text-emerald-500/70">click for brief</span></span>
         </div>
       </div>
       {open && (
-        <div className="absolute top-full left-0 mt-2 z-50 w-[440px] p-5 bg-[#1a2030] border border-slate-700/80 rounded-xl shadow-2xl shadow-black/40">
+        <div className="absolute top-full left-0 mt-2 z-50 w-[440px] p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl shadow-black/20 dark:shadow-black/40">
           <div className="flex items-center gap-2 mb-3">
             <span className={`material-symbols-outlined text-lg ${ACCENT_TEXT}`}>assignment</span>
-            <h4 className="text-sm font-bold text-slate-200">Mission Brief</h4>
+            <h4 className="text-sm font-bold text-slate-900 dark:text-slate-200">Mission Brief</h4>
           </div>
           <div className="space-y-3">
             <div>
               <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">Problem</p>
-              <p className="text-sm text-slate-300 leading-relaxed">
+              <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
                 Weekly orders have dropped by 18% over the past month. Competitors are maintaining steady volume. Leadership needs a data-backed explanation and recovery plan.
               </p>
             </div>
             <div>
               <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">Objective</p>
-              <p className="text-sm text-slate-300 leading-relaxed">
+              <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
                 Investigate the checkout conversion drop by querying AI teammates across analytics, UX research, and engineering. Form hypotheses, gather evidence, and submit a root-cause analysis with proposed recovery actions.
               </p>
             </div>
@@ -369,19 +369,19 @@ export default function WorkspacePage() {
   const currentSuggestions = suggestions.length > 0 ? suggestions : (QUICK_SUGGESTIONS[selectedAgent] || []);
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-[#0A0E1A] text-slate-100" style={{ fontFamily: "'Inter', sans-serif" }}>
+    <div className="h-screen flex flex-col overflow-hidden bg-[#f6f6f8] dark:bg-[#101122] text-slate-900 dark:text-slate-100" style={{ fontFamily: "'Inter', sans-serif" }}>
       {/* ── Header ── */}
-      <header className="flex items-center border-b border-slate-800/80 px-5 py-2 bg-[#0D1117] shrink-0 gap-4">
+      <header className="flex items-center border-b border-slate-200 dark:border-slate-800 px-5 py-2 bg-white dark:bg-slate-900 shrink-0">
         <div className="flex items-center gap-3 shrink-0">
           <span className={`material-symbols-outlined text-2xl ${ACCENT_TEXT}`}>cognition</span>
-          <h2 className="text-base font-bold tracking-tight text-white">SimWork</h2>
+          <h2 className="text-base font-bold tracking-tight text-slate-900 dark:text-white">SimWork</h2>
         </div>
-        {/* Combined mission card */}
-        <div className="ml-4">
+        {/* Combined mission card — centered */}
+        <div className="flex-1 flex justify-center">
           <MissionCard />
         </div>
-        <div className="flex items-center gap-3 ml-auto shrink-0">
-          <div className="flex flex-col items-center px-4 py-1 rounded-lg bg-[#161B26] border border-slate-800/60 min-w-[80px]">
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="flex flex-col items-center px-4 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 min-w-[80px]">
             <span className="text-[9px] uppercase tracking-widest text-slate-500 font-semibold">Time Left</span>
             <span className={`text-sm font-mono font-bold ${ACCENT_TEXT}`}>{timeLeft}</span>
           </div>
@@ -397,8 +397,8 @@ export default function WorkspacePage() {
       {/* ── Main 3-column layout ── */}
       <main className="flex flex-1 overflow-hidden">
         {/* ── Left: Team Panel (wider) ── */}
-        <aside className="w-72 flex flex-col border-r border-slate-800/60 bg-[#0D1117] overflow-hidden shrink-0">
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-800/40">
+        <aside className="w-72 flex flex-col border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shrink-0">
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-200 dark:border-slate-800">
             <span className={`material-symbols-outlined text-lg ${ACCENT_TEXT}`}>groups</span>
             <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Team Panel</h3>
           </div>
@@ -417,14 +417,14 @@ export default function WorkspacePage() {
                   onClick={() => { setSelectedAgent(agent.id); setSuggestions([]); }}
                   className={`rounded-lg p-3 text-left transition-all ${
                     isSelected
-                      ? `bg-[#151C2C] border-l-[3px] ${borderColor[agent.color]}`
-                      : "bg-transparent hover:bg-[#111827] border-l-[3px] border-l-transparent"
+                      ? `bg-slate-50 dark:bg-slate-800/50 border-l-[3px] ${borderColor[agent.color]}`
+                      : "bg-transparent hover:bg-slate-50 dark:hover:bg-slate-800/30 border-l-[3px] border-l-transparent"
                   }`}
                 >
                   <div className="flex items-center gap-2.5">
                     <AgentIcon agent={agent.id} size="md" />
                     <div className="flex flex-col min-w-0">
-                      <h4 className="text-[13px] font-semibold text-slate-200">{agent.label}</h4>
+                      <h4 className="text-[13px] font-semibold text-slate-900 dark:text-slate-200">{agent.label}</h4>
                       <p className="text-[10px] text-slate-500">{agent.subtitle}</p>
                     </div>
                     {isSelected && <div className="ml-auto size-1.5 bg-emerald-400 rounded-full animate-pulse" />}
@@ -432,7 +432,7 @@ export default function WorkspacePage() {
                   {isSelected && (
                     <div className="mt-2.5 flex flex-wrap gap-1">
                       {agent.skills.map((skill) => (
-                        <span key={skill} className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800/80 text-slate-400 font-medium">{skill}</span>
+                        <span key={skill} className="text-[9px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 font-medium">{skill}</span>
                       ))}
                     </div>
                   )}
@@ -442,7 +442,7 @@ export default function WorkspacePage() {
           </div>
 
           {/* Session Stats */}
-          <div className="mt-auto border-t border-slate-800/40">
+          <div className="mt-auto border-t border-slate-200 dark:border-slate-800">
             <div className="px-4 py-3">
               <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2.5">Session Stats</h4>
               <div className="space-y-2">
@@ -455,13 +455,13 @@ export default function WorkspacePage() {
                   <div key={row.label} className="flex items-center gap-2">
                     <span className="material-symbols-outlined text-slate-600 text-xs">{row.icon}</span>
                     <span className="text-[10px] text-slate-500 flex-1">{row.label}</span>
-                    <span className="text-[10px] font-semibold text-slate-300 truncate max-w-[80px]">{row.value}</span>
+                    <span className="text-[10px] font-semibold text-slate-700 dark:text-slate-300 truncate max-w-[80px]">{row.value}</span>
                   </div>
                 ))}
               </div>
             </div>
             <div className="px-3 pb-3">
-              <div className="p-2.5 bg-slate-800/30 rounded-lg border border-slate-800/40">
+              <div className="p-2.5 bg-slate-50 dark:bg-slate-800/30 rounded-lg border border-slate-200 dark:border-slate-800">
                 <p className="text-[9px] text-slate-500 leading-relaxed">
                   Each teammate has their own data domain. Ask focused questions to get the best charts.
                 </p>
@@ -471,9 +471,9 @@ export default function WorkspacePage() {
         </aside>
 
         {/* ── Center: Investigation Chat ── */}
-        <section className="flex flex-col overflow-hidden bg-[#0A0E1A]" style={{ flex: "0 0 44%" }}>
-          <div className="px-4 py-2.5 border-b border-slate-800/60 flex justify-between items-center bg-[#0D1117]/50">
-            <h3 className="text-sm font-semibold flex items-center gap-2 text-slate-300">
+        <section className="flex flex-col overflow-hidden bg-[#f6f6f8] dark:bg-[#101122]" style={{ flex: "0 0 44%" }}>
+          <div className="px-4 py-2.5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-white/50 dark:bg-slate-900/50">
+            <h3 className="text-sm font-semibold flex items-center gap-2 text-slate-700 dark:text-slate-300">
               <span className={`material-symbols-outlined ${ACCENT_TEXT}`}>forum</span>
               Investigation Chat
             </h3>
@@ -504,8 +504,8 @@ export default function WorkspacePage() {
                   </div>
                   <div className={`px-3 py-2 rounded-xl rounded-tl-sm text-[13px] leading-relaxed whitespace-pre-wrap ${
                     msg.role === "user"
-                      ? "bg-emerald-600/20 text-emerald-100 border border-emerald-500/20"
-                      : "bg-[#151C2C] text-slate-300 border border-slate-800/50"
+                      ? "bg-emerald-500/10 dark:bg-emerald-600/20 text-emerald-900 dark:text-emerald-100 border border-emerald-500/20"
+                      : "bg-white dark:bg-slate-800/50 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700/50"
                   }`}>
                     {msg.content}
                   </div>
@@ -529,13 +529,13 @@ export default function WorkspacePage() {
           </div>
 
           {/* Dynamic suggestions (from agent or defaults) */}
-          <div className="px-4 py-1.5 border-t border-slate-800/30 flex gap-1.5 flex-wrap">
+          <div className="px-4 py-1.5 border-t border-slate-200 dark:border-slate-800/30 flex gap-1.5 flex-wrap">
             {currentSuggestions.slice(0, 3).map((s) => (
               <button
                 key={s}
                 onClick={() => sendQuery(s)}
                 disabled={isQuerying}
-                className="text-[10px] px-2.5 py-1 rounded-full border border-slate-700/60 text-slate-400 hover:text-slate-200 hover:border-slate-600 hover:bg-slate-800/40 transition-colors disabled:opacity-40"
+                className="text-[10px] px-2.5 py-1 rounded-full border border-slate-300 dark:border-slate-700/60 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-400 dark:hover:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800/40 transition-colors disabled:opacity-40"
               >
                 {s}
               </button>
@@ -543,10 +543,10 @@ export default function WorkspacePage() {
           </div>
 
           {/* Input */}
-          <div className="px-4 py-2.5 border-t border-slate-800/60 bg-[#0D1117]/50">
+          <div className="px-4 py-2.5 border-t border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50">
             <div className="relative">
               <input
-                className={`w-full bg-[#161B26] border border-slate-700/50 rounded-lg pl-3 pr-10 py-2.5 text-sm text-slate-200 placeholder-slate-600 ${ACCENT_RING} focus:ring-2 focus:border-transparent outline-none`}
+                className={`w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700/50 rounded-lg pl-3 pr-10 py-2.5 text-sm text-slate-900 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-600 ${ACCENT_RING} focus:ring-2 focus:border-transparent outline-none`}
                 placeholder={`Ask ${selectedAgentInfo.label} a question...`}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -565,8 +565,8 @@ export default function WorkspacePage() {
         </section>
 
         {/* ── Right: Dashboard ── */}
-        <aside className="flex-1 flex flex-col border-l border-slate-800/60 bg-[#0D1117] overflow-y-auto">
-          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-800/40">
+        <aside className="flex-1 flex flex-col border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-y-auto">
+          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-200 dark:border-slate-800">
             <span className={`material-symbols-outlined text-lg ${ACCENT_TEXT}`}>dashboard</span>
             <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Dashboard</h3>
             {dashCards.length > 0 && (
@@ -598,13 +598,13 @@ export default function WorkspacePage() {
                     table: "table_rows",
                   };
                   return (
-                    <div key={card.id} className={`bg-[#151C2C] rounded-lg border border-slate-800/50 border-t-2 ${borderAccent[card.agent] || ""} p-4`}>
+                    <div key={card.id} className={`bg-slate-50 dark:bg-slate-800/30 rounded-lg border border-slate-200 dark:border-slate-700/50 border-t-2 ${borderAccent[card.agent] || ""} p-4`}>
                       <div className="flex items-center gap-2 mb-3">
                         <span className="material-symbols-outlined text-slate-500 text-sm">{chartIcon[card.chart.type] || "bar_chart"}</span>
                         <span className="text-[10px] font-semibold text-slate-400">{agentInfo?.label}</span>
                         <span className="text-[9px] text-slate-600 ml-auto">{formatTime(card.timestamp)}</span>
                       </div>
-                      <p className="text-[12px] text-slate-200 font-semibold mb-3">{card.title}</p>
+                      <p className="text-[12px] text-slate-900 dark:text-slate-200 font-semibold mb-3">{card.title}</p>
                       <ChartRenderer chart={card.chart} />
                     </div>
                   );
@@ -615,24 +615,24 @@ export default function WorkspacePage() {
           </div>
 
           {/* Hypotheses */}
-          <div className="border-t border-slate-800/40 px-4 py-3 shrink-0">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-500 flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-sm text-slate-600">lightbulb</span>
+          <div className="border-t border-slate-200 dark:border-slate-800 px-4 py-4 shrink-0 min-h-[140px]">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-xs font-bold uppercase tracking-widest text-slate-500 flex items-center gap-2">
+                <span className="material-symbols-outlined text-base text-emerald-500">lightbulb</span>
                 Saved Hypotheses
               </h4>
               {savedHypotheses.length > 0 && (
-                <span className="text-[9px] bg-emerald-500/15 text-emerald-400 px-2 py-0.5 rounded-full font-bold">{savedHypotheses.length}</span>
+                <span className="text-[10px] bg-emerald-500/15 text-emerald-500 px-2.5 py-0.5 rounded-full font-bold">{savedHypotheses.length}</span>
               )}
             </div>
             {savedHypotheses.length === 0 ? (
-              <p className="text-[10px] text-slate-600">Submit hypotheses below to track them here.</p>
+              <p className="text-xs text-slate-400">Submit hypotheses below to track them here.</p>
             ) : (
-              <div className="flex flex-col gap-1.5 max-h-[18vh] overflow-y-auto">
+              <div className="flex flex-col gap-2 max-h-[30vh] overflow-y-auto">
                 {savedHypotheses.map((h, i) => (
-                  <div key={i} className="bg-[#151C2C] rounded-lg p-2 border border-slate-800/50 flex items-start gap-2">
-                    <span className="text-emerald-500 text-[10px] mt-0.5 font-bold">H{i + 1}</span>
-                    <p className="text-[11px] text-slate-300 leading-snug">{h}</p>
+                  <div key={i} className="bg-slate-50 dark:bg-slate-800/30 rounded-lg p-3 border border-slate-200 dark:border-slate-700/50 flex items-start gap-2.5">
+                    <span className="text-emerald-500 text-xs font-bold mt-0.5 shrink-0">H{i + 1}</span>
+                    <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">{h}</p>
                   </div>
                 ))}
               </div>
@@ -642,11 +642,11 @@ export default function WorkspacePage() {
       </main>
 
       {/* ── Bottom: Hypothesis bar ── */}
-      <footer className="px-5 py-2 bg-[#0D1117] border-t border-slate-800/60 flex items-center gap-3">
+      <footer className="px-5 py-2 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center gap-3">
         <span className={`material-symbols-outlined text-base ${ACCENT_TEXT}`}>lightbulb</span>
         <span className="text-[9px] font-bold uppercase tracking-widest text-slate-500 shrink-0">Hypothesis</span>
         <input
-          className={`flex-1 bg-[#161B26] border border-slate-700/50 rounded-lg px-4 py-2 text-sm text-slate-200 placeholder-slate-600 ${ACCENT_RING} focus:ring-2 focus:border-transparent outline-none`}
+          className={`flex-1 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700/50 rounded-lg px-4 py-2 text-sm text-slate-900 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-600 ${ACCENT_RING} focus:ring-2 focus:border-transparent outline-none`}
           placeholder="I believe the order drop is caused by [reason] because [evidence]..."
           value={hypothesis}
           onChange={(e) => setHypothesis(e.target.value)}
@@ -662,7 +662,7 @@ export default function WorkspacePage() {
         </button>
         <button
           onClick={() => router.push(`/complete/${sessionId}`)}
-          className="bg-[#161B26] hover:bg-slate-700/50 text-slate-300 font-semibold py-2 px-4 rounded-lg flex items-center gap-2 transition-colors border border-slate-700/50 text-sm shrink-0"
+          className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300 font-semibold py-2 px-4 rounded-lg flex items-center gap-2 transition-colors border border-slate-300 dark:border-slate-700/50 text-sm shrink-0"
         >
           Final Plan
           <span className="material-symbols-outlined text-base">description</span>
