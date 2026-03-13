@@ -1,51 +1,121 @@
 restaurant_id,name,cuisine_type,address,rating,owner_id
-R0001,Bella Italia,italian,"222 Market St, Suite 128",3.5,U02529
-R0002,Trattoria Roma,italian,"100 First St, Suite 59",4.0,U03514
-R0003,Pasta Palace,italian,"300 Third Blvd, Suite 92",3.8,U04960
-R0004,Olive Garden Express,italian,"400 Fourth Dr, Suite 86",3.5,U00250
-R0005,La Dolce Vita,italian,"333 Park Ave, Suite 61",3.9,U04069
-R0006,Dragon Palace,chinese,"500 Fifth Ln, Suite 37",4.7,U01153
-R0007,Golden Wok,chinese,"789 Elm Blvd, Suite 108",3.8,U03989
-R0008,Jade Garden,chinese,"300 Third Blvd, Suite 120",4.7,U00324
-R0009,Lucky Star Chinese,chinese,"321 Pine Dr, Suite 174",4.9,U01414
-R0010,Bamboo Kitchen,chinese,"400 Fourth Dr, Suite 140",3.8,U00918
-R0011,Spice Route,indian,"456 Oak Ave, Suite 113",3.7,U00518
-R0012,Curry House,indian,"400 Fourth Dr, Suite 135",4.7,U04672
-R0013,Taj Mahal Kitchen,indian,"111 Broadway, Suite 79",4.6,U03631
-R0014,Mumbai Bites,indian,"400 Fourth Dr, Suite 192",4.5,U02623
-R0015,Saffron Indian,indian,"400 Fourth Dr, Suite 31",4.7,U00579
-R0016,El Sombrero,mexican,"333 Park Ave, Suite 192",4.8,U02599
-R0017,Taco Fiesta,mexican,"222 Market St, Suite 63",4.8,U04080
-R0018,Casa de Burrito,mexican,"321 Pine Dr, Suite 19",4.7,U00719
-R0019,La Cantina,mexican,"400 Fourth Dr, Suite 53",3.9,U01955
-R0020,Aztec Grill,mexican,"456 Oak Ave, Suite 5",4.9,U04384
-R0021,Liberty Diner,american,"789 Elm Blvd, Suite 62",4.2,U00442
-R0022,Eagle Grill,american,"200 Second Ave, Suite 197",4.6,U02739
-R0023,Main Street Eats,american,"555 River Way, Suite 67",4.6,U00216
-R0024,Classic American,american,"400 Fourth Dr, Suite 137",3.5,U00783
-R0025,Blue Plate Special,american,"123 Main St, Suite 63",4.2,U03421
-R0026,Thai Orchid,thai,"111 Broadway, Suite 184",3.9,U00760
-R0027,Bangkok Kitchen,thai,"500 Fifth Ln, Suite 12",4.4,U01057
-R0028,Pad Thai Express,thai,"789 Elm Blvd, Suite 78",3.6,U00621
-R0029,Lotus Thai,thai,"123 Main St, Suite 140",4.5,U00715
-R0030,Siam Garden,thai,"789 Elm Blvd, Suite 133",4.1,U02145
-R0031,Sakura Kitchen,japanese,"456 Oak Ave, Suite 109",4.9,U04507
-R0032,Tokyo Ramen House,japanese,"333 Park Ave, Suite 165",4.2,U01570
-R0033,Zen Japanese,japanese,"456 Oak Ave, Suite 73",3.8,U04653
-R0034,Samurai Grill,japanese,"333 Park Ave, Suite 3",4.3,U01718
-R0035,Nippon Bento,japanese,"123 Main St, Suite 72",4.4,U01538
-R0036,Pizza Planet,pizza,"100 First St, Suite 127",4.4,U02096
-R0037,Slice of Heaven,pizza,"321 Pine Dr, Suite 79",3.8,U02503
-R0038,Napoli Pizza,pizza,"123 Main St, Suite 106",3.7,U02960
-R0039,The Pizza Box,pizza,"123 Main St, Suite 6",3.6,U02411
-R0040,Crust & Co,pizza,"123 Main St, Suite 17",4.7,U00099
-R0041,Burger Barn,burgers,"456 Oak Ave, Suite 52",4.4,U01000
-R0042,The Patty Shack,burgers,"111 Broadway, Suite 86",3.8,U03730
-R0043,Flame Grill Burgers,burgers,"789 Elm Blvd, Suite 13",4.3,U03870
-R0044,Stack House,burgers,"789 Elm Blvd, Suite 176",4.6,U01048
-R0045,Bun & Done,burgers,"555 River Way, Suite 92",4.5,U03468
-R0046,Sushi Master,sushi,"200 Second Ave, Suite 119",4.6,U01069
-R0047,Rolling Fish,sushi,"333 Park Ave, Suite 97",4.4,U00629
-R0048,Ocean Roll,sushi,"300 Third Blvd, Suite 196",4.5,U04915
-R0049,Fresh Catch Sushi,sushi,"444 Lake Rd, Suite 150",4.7,U04541
-R0050,Blue Fin Sushi,sushi,"444 Lake Rd, Suite 117",4.2,U04024
+R0001,Punjabi Tadka,north_indian,"Shop 156, Jayanagar, Bengaluru",3.8,U05603
+R0002,Royal Curry House,north_indian,"Shop 140, Whitefield, Bengaluru",4.3,U03509
+R0003,Filter Coffee Stories,south_indian,"Shop 16, Whitefield, Bengaluru",4.3,U00914
+R0004,Dosa Darbar,south_indian,"Shop 61, Jayanagar, Bengaluru",4.0,U00113
+R0005,Hyderabadi Handi,biryani,"Shop 128, HSR Layout, Bengaluru",4.6,U02511
+R0006,Dum Safar,biryani,"Shop 63, Indiranagar, Bengaluru",4.5,U02192
+R0007,Nukkad Eats,street_food,"Shop 113, Indiranagar, Bengaluru",4.4,U06219
+R0008,Bombay Bites,street_food,"Shop 27, Koramangala, Bengaluru",4.2,U05447
+R0009,Raj Kachori Point,chaat,"Shop 217, HSR Layout, Bengaluru",3.8,U01978
+R0010,Tangy Tales,chaat,"Shop 207, Whitefield, Bengaluru",3.8,U02620
+R0011,Kulfi Collective,desserts,"Shop 7, Whitefield, Bengaluru",4.7,U00677
+R0012,Mithai Studio,desserts,"Shop 135, Koramangala, Bengaluru",4.4,U02683
+R0013,Crust Republic,pizza,"Shop 167, HSR Layout, Bengaluru",4.5,U00147
+R0014,Oven Stories Local,pizza,"Shop 46, HSR Layout, Bengaluru",3.7,U04626
+R0015,Stacked Bun Co.,burgers,"Shop 92, Jayanagar, Bengaluru",4.7,U03958
+R0016,Patty Pe Charcha,burgers,"Shop 131, Indiranagar, Bengaluru",4.3,U00553
+R0017,Hakka Stories,chinese,"Shop 104, Whitefield, Bengaluru",3.8,U04140
+R0018,Dragon Wok Express,chinese,"Shop 192, Indiranagar, Bengaluru",4.4,U04968
+R0019,Salad & Soul,healthy,"Shop 112, Koramangala, Bengaluru",3.8,U05206
+R0020,Protein Pantry,healthy,"Shop 91, Jayanagar, Bengaluru",3.7,U02207
+R0021,Royal Curry House,north_indian,"Shop 134, Ghatkopar, Mumbai",4.7,U05293
+R0022,Dilli Zaika,north_indian,"Shop 9, Lower Parel, Mumbai",4.8,U04183
+R0023,Anna Idli House,south_indian,"Shop 207, Lower Parel, Mumbai",3.8,U01650
+R0024,Dosa Darbar,south_indian,"Shop 41, Andheri West, Mumbai",4.6,U05471
+R0025,Biryani Junction,biryani,"Shop 38, Lower Parel, Mumbai",3.9,U04542
+R0026,Hyderabadi Handi,biryani,"Shop 56, Powai, Mumbai",4.8,U01978
+R0027,The Frankie Stop,street_food,"Shop 127, Ghatkopar, Mumbai",3.9,U04083
+R0028,Nukkad Eats,street_food,"Shop 214, Andheri West, Mumbai",4.5,U05654
+R0029,Tangy Tales,chaat,"Shop 34, Ghatkopar, Mumbai",3.9,U03479
+R0030,Raj Kachori Point,chaat,"Shop 182, Ghatkopar, Mumbai",4.8,U00952
+R0031,Sweet Cravings,desserts,"Shop 74, Powai, Mumbai",3.9,U06482
+R0032,Kulfi Collective,desserts,"Shop 51, Ghatkopar, Mumbai",3.9,U01180
+R0033,Oven Stories Local,pizza,"Shop 68, Ghatkopar, Mumbai",4.7,U01474
+R0034,Cheese Burst Co.,pizza,"Shop 176, Andheri West, Mumbai",4.5,U02536
+R0035,Patty Pe Charcha,burgers,"Shop 11, Powai, Mumbai",4.4,U03599
+R0036,Stacked Bun Co.,burgers,"Shop 69, Ghatkopar, Mumbai",4.1,U00917
+R0037,Wok & Bowl,chinese,"Shop 161, Andheri West, Mumbai",4.4,U05808
+R0038,Hakka Stories,chinese,"Shop 90, Powai, Mumbai",4.8,U00413
+R0039,Protein Pantry,healthy,"Shop 60, Bandra, Mumbai",4.6,U05252
+R0040,Salad & Soul,healthy,"Shop 199, Andheri West, Mumbai",4.1,U04708
+R0041,Ghar Ka Khana Co.,north_indian,"Shop 158, Dwarka, Delhi Ncr",4.4,U05785
+R0042,Royal Curry House,north_indian,"Shop 78, Dwarka, Delhi Ncr",4.6,U05501
+R0043,Dosa Darbar,south_indian,"Shop 152, Dwarka, Delhi Ncr",4.2,U02853
+R0044,Udupi Breakfast Club,south_indian,"Shop 136, Noida Sector 62, Delhi Ncr",4.4,U05912
+R0045,Biryani Junction,biryani,"Shop 152, Noida Sector 62, Delhi Ncr",3.8,U01218
+R0046,Biryani Adda,biryani,"Shop 29, Saket, Delhi Ncr",4.4,U00836
+R0047,Rolls & Rice,street_food,"Shop 15, Noida Sector 62, Delhi Ncr",3.7,U00876
+R0048,The Frankie Stop,street_food,"Shop 51, Saket, Delhi Ncr",4.7,U03056
+R0049,Chaat Junction,chaat,"Shop 106, Saket, Delhi Ncr",4.0,U04725
+R0050,Tangy Tales,chaat,"Shop 216, Indirapuram, Delhi Ncr",4.6,U06359
+R0051,Kulfi Collective,desserts,"Shop 38, Noida Sector 62, Delhi Ncr",3.8,U05975
+R0052,Mithai Studio,desserts,"Shop 46, Noida Sector 62, Delhi Ncr",4.3,U00274
+R0053,Cheese Burst Co.,pizza,"Shop 18, Dwarka, Delhi Ncr",4.5,U06293
+R0054,Slice Junction,pizza,"Shop 80, Indirapuram, Delhi Ncr",4.3,U01698
+R0055,Patty Pe Charcha,burgers,"Shop 6, Dwarka, Delhi Ncr",4.8,U04316
+R0056,Burger Adda,burgers,"Shop 115, Indirapuram, Delhi Ncr",3.9,U04254
+R0057,Wok & Bowl,chinese,"Shop 60, Gurugram Sector 56, Delhi Ncr",4.2,U00915
+R0058,Dragon Wok Express,chinese,"Shop 50, Indirapuram, Delhi Ncr",4.1,U01152
+R0059,Balanced Bowls,healthy,"Shop 210, Indirapuram, Delhi Ncr",3.9,U04883
+R0060,Green Plate Kitchen,healthy,"Shop 98, Gurugram Sector 56, Delhi Ncr",4.4,U00875
+R0061,Punjabi Tadka,north_indian,"Shop 80, Kukatpally, Hyderabad",4.5,U02212
+R0062,Royal Curry House,north_indian,"Shop 146, Kukatpally, Hyderabad",4.5,U06445
+R0063,Udupi Breakfast Club,south_indian,"Shop 116, Gachibowli, Hyderabad",4.0,U05227
+R0064,Anna Idli House,south_indian,"Shop 192, Banjara Hills, Hyderabad",4.3,U01895
+R0065,Biryani Adda,biryani,"Shop 117, Gachibowli, Hyderabad",4.4,U00502
+R0066,Nawab Dum House,biryani,"Shop 71, Kukatpally, Hyderabad",3.9,U03242
+R0067,Nukkad Eats,street_food,"Shop 10, Kondapur, Hyderabad",4.6,U03602
+R0068,Street Treats Co.,street_food,"Shop 6, Madhapur, Hyderabad",4.7,U02629
+R0069,Raj Kachori Point,chaat,"Shop 135, Kukatpally, Hyderabad",4.6,U01067
+R0070,Golgappa Factory,chaat,"Shop 144, Kondapur, Hyderabad",3.8,U05928
+R0071,Kulfi Collective,desserts,"Shop 210, Kukatpally, Hyderabad",4.3,U01468
+R0072,Shahi Sweets,desserts,"Shop 135, Gachibowli, Hyderabad",3.8,U02638
+R0073,Cheese Burst Co.,pizza,"Shop 126, Banjara Hills, Hyderabad",4.8,U04847
+R0074,Slice Junction,pizza,"Shop 90, Gachibowli, Hyderabad",4.2,U04223
+R0075,Stacked Bun Co.,burgers,"Shop 20, Banjara Hills, Hyderabad",4.2,U03041
+R0076,Burger Adda,burgers,"Shop 28, Kondapur, Hyderabad",4.7,U02631
+R0077,Dragon Wok Express,chinese,"Shop 117, Madhapur, Hyderabad",3.7,U06323
+R0078,Wok & Bowl,chinese,"Shop 109, Banjara Hills, Hyderabad",4.7,U05580
+R0079,Balanced Bowls,healthy,"Shop 198, Gachibowli, Hyderabad",3.8,U01909
+R0080,Fresh Pressed,healthy,"Shop 204, Kukatpally, Hyderabad",4.5,U00566
+R0081,Punjabi Tadka,north_indian,"Shop 88, Wakad, Pune",4.5,U02761
+R0082,Ghar Ka Khana Co.,north_indian,"Shop 155, Hinjewadi, Pune",4.2,U02007
+R0083,Anna Idli House,south_indian,"Shop 178, Viman Nagar, Pune",4.0,U00468
+R0084,Udupi Breakfast Club,south_indian,"Shop 162, Baner, Pune",4.8,U00633
+R0085,Biryani Adda,biryani,"Shop 149, Baner, Pune",4.4,U05170
+R0086,Nawab Dum House,biryani,"Shop 109, Hinjewadi, Pune",4.6,U00799
+R0087,Street Treats Co.,street_food,"Shop 6, Hinjewadi, Pune",4.8,U02350
+R0088,The Frankie Stop,street_food,"Shop 135, Viman Nagar, Pune",3.7,U01062
+R0089,Tangy Tales,chaat,"Shop 49, Baner, Pune",4.2,U02215
+R0090,Chaat Junction,chaat,"Shop 35, Viman Nagar, Pune",4.2,U02446
+R0091,Sweet Cravings,desserts,"Shop 40, Kothrud, Pune",4.7,U02951
+R0092,Dessert Wale,desserts,"Shop 18, Viman Nagar, Pune",4.2,U06290
+R0093,Slice Junction,pizza,"Shop 172, Wakad, Pune",3.7,U04964
+R0094,Cheese Burst Co.,pizza,"Shop 101, Kothrud, Pune",4.4,U03614
+R0095,Patty Pe Charcha,burgers,"Shop 211, Hinjewadi, Pune",4.8,U03689
+R0096,Burger Adda,burgers,"Shop 162, Hinjewadi, Pune",4.2,U02832
+R0097,Wok & Bowl,chinese,"Shop 83, Kothrud, Pune",4.8,U05697
+R0098,Wok on Fire,chinese,"Shop 5, Viman Nagar, Pune",3.8,U04401
+R0099,Green Plate Kitchen,healthy,"Shop 207, Wakad, Pune",4.0,U06124
+R0100,Fresh Pressed,healthy,"Shop 114, Viman Nagar, Pune",4.7,U02676
+R0101,Royal Curry House,north_indian,"Shop 70, OMR, Chennai",4.8,U02412
+R0102,Punjabi Tadka,north_indian,"Shop 83, Velachery, Chennai",3.8,U02133
+R0103,Filter Coffee Stories,south_indian,"Shop 179, Adyar, Chennai",4.1,U05456
+R0104,Anna Idli House,south_indian,"Shop 207, OMR, Chennai",3.7,U02299
+R0105,Nawab Dum House,biryani,"Shop 189, Velachery, Chennai",4.4,U03225
+R0106,Biryani Adda,biryani,"Shop 156, Adyar, Chennai",4.4,U06032
+R0107,The Frankie Stop,street_food,"Shop 21, Velachery, Chennai",4.7,U01836
+R0108,Rolls & Rice,street_food,"Shop 80, Velachery, Chennai",4.1,U00273
+R0109,Golgappa Factory,chaat,"Shop 164, OMR, Chennai",3.7,U03922
+R0110,Chaat Junction,chaat,"Shop 218, Velachery, Chennai",4.6,U02088
+R0111,Sweet Cravings,desserts,"Shop 82, Adyar, Chennai",4.0,U04253
+R0112,Dessert Wale,desserts,"Shop 6, Velachery, Chennai",4.7,U00330
+R0113,Pizza Planet India,pizza,"Shop 185, Adyar, Chennai",4.0,U03378
+R0114,Crust Republic,pizza,"Shop 67, Adyar, Chennai",4.2,U05106
+R0115,Desi Burger Lab,burgers,"Shop 190, Adyar, Chennai",4.6,U04387
+R0116,Burger Adda,burgers,"Shop 46, Adyar, Chennai",4.1,U02960
+R0117,Desi Chinese Hub,chinese,"Shop 104, Adyar, Chennai",3.8,U03482
+R0118,Dragon Wok Express,chinese,"Shop 111, OMR, Chennai",3.8,U00496
+R0119,Salad & Soul,healthy,"Shop 157, OMR, Chennai",4.5,U02715
+R0120,Balanced Bowls,healthy,"Shop 132, Velachery, Chennai",3.9,U00919

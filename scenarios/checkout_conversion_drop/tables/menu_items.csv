@@ -1,285 +1,542 @@
 item_id,restaurant_id,name,description,price
-MI00001,R0001,Risotto Mushroom,Creamy arborio rice with wild mushrooms,17.25
-MI00002,R0001,Tiramisu,Classic Italian coffee dessert,8.00
-MI00003,R0001,Fettuccine Alfredo,Creamy garlic parmesan pasta,18.53
-MI00004,R0001,Chicken Parmigiana,Breaded chicken with marinara and cheese,20.25
-MI00005,R0001,Margherita Pizza,"Classic tomato sauce, mozzarella, and basil",12.59
-MI00006,R0001,Lasagna,Layered pasta with meat sauce and ricotta,21.80
-MI00007,R0001,Spaghetti Carbonara,Creamy pasta with pancetta and parmesan,15.56
-MI00008,R0002,Chicken Parmigiana,Breaded chicken with marinara and cheese,17.92
-MI00009,R0002,Margherita Pizza,"Classic tomato sauce, mozzarella, and basil",12.82
-MI00010,R0002,Risotto Mushroom,Creamy arborio rice with wild mushrooms,15.77
-MI00011,R0002,Bruschetta,"Toasted bread with tomatoes, garlic, and basil",10.39
-MI00012,R0002,Fettuccine Alfredo,Creamy garlic parmesan pasta,16.51
-MI00013,R0002,Lasagna,Layered pasta with meat sauce and ricotta,21.51
-MI00014,R0002,Tiramisu,Classic Italian coffee dessert,12.66
-MI00015,R0003,Risotto Mushroom,Creamy arborio rice with wild mushrooms,15.96
-MI00016,R0003,Lasagna,Layered pasta with meat sauce and ricotta,18.77
-MI00017,R0003,Tiramisu,Classic Italian coffee dessert,13.29
-MI00018,R0003,Spaghetti Carbonara,Creamy pasta with pancetta and parmesan,14.21
-MI00019,R0004,Lasagna,Layered pasta with meat sauce and ricotta,21.13
-MI00020,R0004,Risotto Mushroom,Creamy arborio rice with wild mushrooms,19.63
-MI00021,R0004,Chicken Parmigiana,Breaded chicken with marinara and cheese,19.57
-MI00022,R0004,Margherita Pizza,"Classic tomato sauce, mozzarella, and basil",16.34
-MI00023,R0004,Spaghetti Carbonara,Creamy pasta with pancetta and parmesan,20.35
-MI00024,R0004,Tiramisu,Classic Italian coffee dessert,8.00
-MI00025,R0004,Bruschetta,"Toasted bread with tomatoes, garlic, and basil",14.89
-MI00026,R0004,Fettuccine Alfredo,Creamy garlic parmesan pasta,17.46
-MI00027,R0005,Lasagna,Layered pasta with meat sauce and ricotta,21.30
-MI00028,R0005,Tiramisu,Classic Italian coffee dessert,12.79
-MI00029,R0005,Spaghetti Carbonara,Creamy pasta with pancetta and parmesan,18.21
-MI00030,R0005,Margherita Pizza,"Classic tomato sauce, mozzarella, and basil",17.37
-MI00031,R0005,Chicken Parmigiana,Breaded chicken with marinara and cheese,20.08
-MI00032,R0006,Kung Pao Chicken,Spicy stir-fried chicken with peanuts,14.60
-MI00033,R0006,Fried Rice,Wok-fried rice with egg and vegetables,11.20
-MI00034,R0006,Mapo Tofu,Spicy tofu in Sichuan sauce,12.94
-MI00035,R0006,Beef Chow Mein,Stir-fried noodles with beef and vegetables,14.19
-MI00036,R0006,Sweet and Sour Pork,Crispy pork in tangy sauce,12.98
-MI00037,R0006,Dim Sum Platter,Assorted steamed dumplings,14.38
-MI00038,R0006,Spring Rolls,Crispy vegetable rolls with dipping sauce,10.28
-MI00039,R0007,Dim Sum Platter,Assorted steamed dumplings,17.91
-MI00040,R0007,Beef Chow Mein,Stir-fried noodles with beef and vegetables,12.95
-MI00041,R0007,Sweet and Sour Pork,Crispy pork in tangy sauce,12.39
-MI00042,R0007,Spring Rolls,Crispy vegetable rolls with dipping sauce,13.27
-MI00043,R0008,Fried Rice,Wok-fried rice with egg and vegetables,10.87
-MI00044,R0008,Dim Sum Platter,Assorted steamed dumplings,20.56
-MI00045,R0008,Beef Chow Mein,Stir-fried noodles with beef and vegetables,16.95
-MI00046,R0008,Mapo Tofu,Spicy tofu in Sichuan sauce,13.15
-MI00047,R0008,Kung Pao Chicken,Spicy stir-fried chicken with peanuts,19.57
-MI00048,R0008,Sweet and Sour Pork,Crispy pork in tangy sauce,15.61
-MI00049,R0009,Fried Rice,Wok-fried rice with egg and vegetables,15.82
-MI00050,R0009,Spring Rolls,Crispy vegetable rolls with dipping sauce,12.59
-MI00051,R0009,Dim Sum Platter,Assorted steamed dumplings,19.34
-MI00052,R0009,Mapo Tofu,Spicy tofu in Sichuan sauce,10.22
-MI00053,R0009,Beef Chow Mein,Stir-fried noodles with beef and vegetables,11.27
-MI00054,R0009,Kung Pao Chicken,Spicy stir-fried chicken with peanuts,18.46
-MI00055,R0009,Sweet and Sour Pork,Crispy pork in tangy sauce,16.75
-MI00056,R0010,Beef Chow Mein,Stir-fried noodles with beef and vegetables,14.46
-MI00057,R0010,Kung Pao Chicken,Spicy stir-fried chicken with peanuts,19.79
-MI00058,R0010,Mapo Tofu,Spicy tofu in Sichuan sauce,16.91
-MI00059,R0010,Dim Sum Platter,Assorted steamed dumplings,19.48
-MI00060,R0011,Chicken Biryani,Fragrant rice with spiced chicken,16.76
-MI00061,R0011,Butter Chicken,Tender chicken in creamy tomato sauce,14.11
-MI00062,R0011,Tikka Masala,Grilled chicken in spiced masala sauce,21.61
-MI00063,R0011,Palak Paneer,Spinach and cottage cheese curry,12.66
-MI00064,R0011,Naan Bread,Traditional tandoor-baked flatbread,12.21
-MI00065,R0011,Lamb Vindaloo,Spicy lamb curry with potatoes,22.67
-MI00066,R0012,Naan Bread,Traditional tandoor-baked flatbread,8.00
-MI00067,R0012,Chicken Biryani,Fragrant rice with spiced chicken,14.91
-MI00068,R0012,Samosa,Crispy pastry with spiced potato filling,13.72
-MI00069,R0012,Tikka Masala,Grilled chicken in spiced masala sauce,15.88
-MI00070,R0012,Butter Chicken,Tender chicken in creamy tomato sauce,16.05
-MI00071,R0012,Lamb Vindaloo,Spicy lamb curry with potatoes,21.77
-MI00072,R0013,Butter Chicken,Tender chicken in creamy tomato sauce,19.64
-MI00073,R0013,Samosa,Crispy pastry with spiced potato filling,13.86
-MI00074,R0013,Palak Paneer,Spinach and cottage cheese curry,15.51
-MI00075,R0013,Chicken Biryani,Fragrant rice with spiced chicken,16.26
-MI00076,R0013,Lamb Vindaloo,Spicy lamb curry with potatoes,16.10
-MI00077,R0013,Tikka Masala,Grilled chicken in spiced masala sauce,16.70
-MI00078,R0013,Naan Bread,Traditional tandoor-baked flatbread,8.28
-MI00079,R0014,Samosa,Crispy pastry with spiced potato filling,12.50
-MI00080,R0014,Palak Paneer,Spinach and cottage cheese curry,12.20
-MI00081,R0014,Tikka Masala,Grilled chicken in spiced masala sauce,16.71
-MI00082,R0014,Lamb Vindaloo,Spicy lamb curry with potatoes,18.16
-MI00083,R0015,Samosa,Crispy pastry with spiced potato filling,12.28
-MI00084,R0015,Chicken Biryani,Fragrant rice with spiced chicken,17.47
-MI00085,R0015,Naan Bread,Traditional tandoor-baked flatbread,8.00
-MI00086,R0015,Tikka Masala,Grilled chicken in spiced masala sauce,20.59
-MI00087,R0015,Palak Paneer,Spinach and cottage cheese curry,13.59
-MI00088,R0015,Lamb Vindaloo,Spicy lamb curry with potatoes,22.88
-MI00089,R0015,Butter Chicken,Tender chicken in creamy tomato sauce,19.62
-MI00090,R0016,Enchiladas,Rolled tortillas in red sauce with cheese,14.99
-MI00091,R0016,Guacamole & Chips,Fresh avocado dip with tortilla chips,8.16
-MI00092,R0016,Beef Tacos,Three corn tortillas with seasoned beef,15.99
-MI00093,R0016,Nachos Supreme,Loaded nachos with all the fixings,12.85
-MI00094,R0016,Quesadilla,Grilled tortilla with cheese and chicken,15.50
-MI00095,R0016,Chicken Burrito,"Flour tortilla with chicken, rice, and beans",15.76
-MI00096,R0017,Chicken Burrito,"Flour tortilla with chicken, rice, and beans",12.72
-MI00097,R0017,Enchiladas,Rolled tortillas in red sauce with cheese,14.73
-MI00098,R0017,Nachos Supreme,Loaded nachos with all the fixings,17.70
-MI00099,R0017,Beef Tacos,Three corn tortillas with seasoned beef,16.46
-MI00100,R0018,Quesadilla,Grilled tortilla with cheese and chicken,13.16
-MI00101,R0018,Chicken Burrito,"Flour tortilla with chicken, rice, and beans",17.28
-MI00102,R0018,Enchiladas,Rolled tortillas in red sauce with cheese,16.32
-MI00103,R0018,Nachos Supreme,Loaded nachos with all the fixings,12.15
-MI00104,R0018,Beef Tacos,Three corn tortillas with seasoned beef,11.90
-MI00105,R0018,Guacamole & Chips,Fresh avocado dip with tortilla chips,14.32
-MI00106,R0019,Quesadilla,Grilled tortilla with cheese and chicken,11.07
-MI00107,R0019,Beef Tacos,Three corn tortillas with seasoned beef,16.81
-MI00108,R0019,Enchiladas,Rolled tortillas in red sauce with cheese,18.56
-MI00109,R0019,Nachos Supreme,Loaded nachos with all the fixings,17.47
-MI00110,R0019,Guacamole & Chips,Fresh avocado dip with tortilla chips,10.31
-MI00111,R0019,Chicken Burrito,"Flour tortilla with chicken, rice, and beans",13.66
-MI00112,R0020,Chicken Burrito,"Flour tortilla with chicken, rice, and beans",12.80
-MI00113,R0020,Beef Tacos,Three corn tortillas with seasoned beef,14.46
-MI00114,R0020,Enchiladas,Rolled tortillas in red sauce with cheese,13.79
-MI00115,R0020,Guacamole & Chips,Fresh avocado dip with tortilla chips,13.85
-MI00116,R0020,Quesadilla,Grilled tortilla with cheese and chicken,15.31
-MI00117,R0020,Nachos Supreme,Loaded nachos with all the fixings,16.48
-MI00118,R0021,Caesar Salad,Romaine lettuce with croutons and parmesan,11.73
-MI00119,R0021,Classic Cheeseburger,Angus beef patty with cheddar and fixings,14.81
-MI00120,R0021,Apple Pie,Classic American apple pie with ice cream,11.08
-MI00121,R0021,Philly Cheesesteak,Sliced beef with melted cheese on hoagie,13.37
-MI00122,R0022,Grilled Chicken Sandwich,Herb-marinated chicken breast sandwich,17.84
-MI00123,R0022,BBQ Ribs,Slow-smoked pork ribs with BBQ sauce,22.17
-MI00124,R0022,Philly Cheesesteak,Sliced beef with melted cheese on hoagie,14.15
-MI00125,R0022,Classic Cheeseburger,Angus beef patty with cheddar and fixings,18.05
-MI00126,R0023,Philly Cheesesteak,Sliced beef with melted cheese on hoagie,15.21
-MI00127,R0023,BBQ Ribs,Slow-smoked pork ribs with BBQ sauce,22.97
-MI00128,R0023,Grilled Chicken Sandwich,Herb-marinated chicken breast sandwich,11.87
-MI00129,R0023,Apple Pie,Classic American apple pie with ice cream,9.87
-MI00130,R0023,Mac and Cheese,Creamy baked macaroni and cheese,15.74
-MI00131,R0023,Caesar Salad,Romaine lettuce with croutons and parmesan,12.19
-MI00132,R0023,Classic Cheeseburger,Angus beef patty with cheddar and fixings,17.35
-MI00133,R0024,Philly Cheesesteak,Sliced beef with melted cheese on hoagie,18.54
-MI00134,R0024,Mac and Cheese,Creamy baked macaroni and cheese,9.60
-MI00135,R0024,Grilled Chicken Sandwich,Herb-marinated chicken breast sandwich,12.93
-MI00136,R0024,Apple Pie,Classic American apple pie with ice cream,12.79
-MI00137,R0024,Caesar Salad,Romaine lettuce with croutons and parmesan,12.20
-MI00138,R0024,Classic Cheeseburger,Angus beef patty with cheddar and fixings,15.07
-MI00139,R0024,BBQ Ribs,Slow-smoked pork ribs with BBQ sauce,25.42
-MI00140,R0025,Mac and Cheese,Creamy baked macaroni and cheese,9.42
-MI00141,R0025,BBQ Ribs,Slow-smoked pork ribs with BBQ sauce,20.75
-MI00142,R0025,Caesar Salad,Romaine lettuce with croutons and parmesan,15.96
-MI00143,R0025,Philly Cheesesteak,Sliced beef with melted cheese on hoagie,17.06
-MI00144,R0025,Grilled Chicken Sandwich,Herb-marinated chicken breast sandwich,16.96
-MI00145,R0025,Apple Pie,Classic American apple pie with ice cream,9.18
-MI00146,R0026,Green Curry,Coconut green curry with chicken,15.43
-MI00147,R0026,Satay Skewers,Grilled chicken with peanut sauce,11.59
-MI00148,R0026,Thai Fried Rice,Wok-fried jasmine rice with basil,12.61
-MI00149,R0026,Pad Thai,Stir-fried rice noodles with shrimp,14.43
-MI00150,R0027,Satay Skewers,Grilled chicken with peanut sauce,10.20
-MI00151,R0027,Green Curry,Coconut green curry with chicken,16.63
-MI00152,R0027,Tom Yum Soup,Spicy and sour shrimp soup,12.35
-MI00153,R0027,Mango Sticky Rice,Sweet coconut rice with fresh mango,14.48
-MI00154,R0028,Tom Yum Soup,Spicy and sour shrimp soup,15.66
-MI00155,R0028,Pad Thai,Stir-fried rice noodles with shrimp,14.52
-MI00156,R0028,Mango Sticky Rice,Sweet coconut rice with fresh mango,13.52
-MI00157,R0028,Satay Skewers,Grilled chicken with peanut sauce,14.76
-MI00158,R0028,Thai Fried Rice,Wok-fried jasmine rice with basil,17.38
-MI00159,R0028,Green Curry,Coconut green curry with chicken,15.51
-MI00160,R0029,Satay Skewers,Grilled chicken with peanut sauce,11.00
-MI00161,R0029,Mango Sticky Rice,Sweet coconut rice with fresh mango,14.37
-MI00162,R0029,Thai Fried Rice,Wok-fried jasmine rice with basil,14.96
-MI00163,R0029,Green Curry,Coconut green curry with chicken,14.85
-MI00164,R0029,Tom Yum Soup,Spicy and sour shrimp soup,14.11
-MI00165,R0029,Pad Thai,Stir-fried rice noodles with shrimp,12.24
-MI00166,R0030,Tom Yum Soup,Spicy and sour shrimp soup,13.98
-MI00167,R0030,Pad Thai,Stir-fried rice noodles with shrimp,18.12
-MI00168,R0030,Thai Fried Rice,Wok-fried jasmine rice with basil,17.47
-MI00169,R0030,Green Curry,Coconut green curry with chicken,15.73
-MI00170,R0030,Mango Sticky Rice,Sweet coconut rice with fresh mango,11.82
-MI00171,R0030,Satay Skewers,Grilled chicken with peanut sauce,9.88
-MI00172,R0031,Gyoza,Pan-fried pork dumplings,13.50
-MI00173,R0031,Tempura Udon,Thick noodles with shrimp tempura,17.71
-MI00174,R0031,Tonkotsu Ramen,Rich pork bone broth ramen,17.94
-MI00175,R0031,Katsu Curry,Breaded pork cutlet with Japanese curry,21.32
-MI00176,R0031,Edamame,Steamed soybeans with sea salt,12.06
-MI00177,R0031,Teriyaki Chicken,Grilled chicken with teriyaki glaze,17.57
-MI00178,R0032,Teriyaki Chicken,Grilled chicken with teriyaki glaze,19.20
-MI00179,R0032,Edamame,Steamed soybeans with sea salt,8.00
-MI00180,R0032,Tempura Udon,Thick noodles with shrimp tempura,15.27
-MI00181,R0032,Katsu Curry,Breaded pork cutlet with Japanese curry,21.02
-MI00182,R0032,Gyoza,Pan-fried pork dumplings,9.77
-MI00183,R0032,Tonkotsu Ramen,Rich pork bone broth ramen,20.84
-MI00184,R0033,Edamame,Steamed soybeans with sea salt,8.00
-MI00185,R0033,Katsu Curry,Breaded pork cutlet with Japanese curry,20.84
-MI00186,R0033,Teriyaki Chicken,Grilled chicken with teriyaki glaze,17.30
-MI00187,R0033,Tempura Udon,Thick noodles with shrimp tempura,18.90
-MI00188,R0033,Tonkotsu Ramen,Rich pork bone broth ramen,15.56
-MI00189,R0034,Katsu Curry,Breaded pork cutlet with Japanese curry,21.67
-MI00190,R0034,Teriyaki Chicken,Grilled chicken with teriyaki glaze,15.52
-MI00191,R0034,Tempura Udon,Thick noodles with shrimp tempura,18.57
-MI00192,R0034,Gyoza,Pan-fried pork dumplings,13.56
-MI00193,R0034,Edamame,Steamed soybeans with sea salt,10.95
-MI00194,R0034,Tonkotsu Ramen,Rich pork bone broth ramen,16.08
-MI00195,R0035,Tempura Udon,Thick noodles with shrimp tempura,12.92
-MI00196,R0035,Katsu Curry,Breaded pork cutlet with Japanese curry,15.41
-MI00197,R0035,Teriyaki Chicken,Grilled chicken with teriyaki glaze,18.78
-MI00198,R0035,Edamame,Steamed soybeans with sea salt,11.25
-MI00199,R0036,Veggie Supreme,Loaded vegetable pizza,17.90
-MI00200,R0036,Hawaiian Pizza,Ham and pineapple pizza,14.50
-MI00201,R0036,Buffalo Wings,Spicy chicken wings with ranch,14.80
-MI00202,R0036,Garlic Bread,Toasted bread with garlic butter,8.00
-MI00203,R0036,Pepperoni Pizza,Classic pepperoni with mozzarella,13.64
-MI00204,R0036,BBQ Chicken Pizza,Chicken with BBQ sauce and red onion,20.96
-MI00205,R0037,Veggie Supreme,Loaded vegetable pizza,20.49
-MI00206,R0037,Garlic Bread,Toasted bread with garlic butter,8.14
-MI00207,R0037,BBQ Chicken Pizza,Chicken with BBQ sauce and red onion,19.89
-MI00208,R0037,Buffalo Wings,Spicy chicken wings with ranch,16.27
-MI00209,R0037,Hawaiian Pizza,Ham and pineapple pizza,16.98
-MI00210,R0037,Pepperoni Pizza,Classic pepperoni with mozzarella,15.48
-MI00211,R0038,Buffalo Wings,Spicy chicken wings with ranch,15.08
-MI00212,R0038,Garlic Bread,Toasted bread with garlic butter,9.45
-MI00213,R0038,Pepperoni Pizza,Classic pepperoni with mozzarella,19.12
-MI00214,R0038,BBQ Chicken Pizza,Chicken with BBQ sauce and red onion,19.77
-MI00215,R0038,Hawaiian Pizza,Ham and pineapple pizza,18.04
-MI00216,R0038,Veggie Supreme,Loaded vegetable pizza,19.61
-MI00217,R0039,Buffalo Wings,Spicy chicken wings with ranch,16.32
-MI00218,R0039,Pepperoni Pizza,Classic pepperoni with mozzarella,14.13
-MI00219,R0039,Hawaiian Pizza,Ham and pineapple pizza,16.20
-MI00220,R0039,Garlic Bread,Toasted bread with garlic butter,8.00
-MI00221,R0039,Veggie Supreme,Loaded vegetable pizza,20.04
-MI00222,R0039,BBQ Chicken Pizza,Chicken with BBQ sauce and red onion,21.40
-MI00223,R0040,BBQ Chicken Pizza,Chicken with BBQ sauce and red onion,20.37
-MI00224,R0040,Pepperoni Pizza,Classic pepperoni with mozzarella,14.94
-MI00225,R0040,Buffalo Wings,Spicy chicken wings with ranch,10.28
-MI00226,R0040,Hawaiian Pizza,Ham and pineapple pizza,17.10
-MI00227,R0040,Veggie Supreme,Loaded vegetable pizza,16.73
-MI00228,R0040,Garlic Bread,Toasted bread with garlic butter,10.65
-MI00229,R0041,Double Stack Burger,Two beef patties with cheese and sauce,15.62
-MI00230,R0041,Mushroom Swiss Burger,Beef patty with mushrooms and Swiss,13.56
-MI00231,R0041,Loaded Fries,"Fries with cheese, bacon, and sour cream",8.86
-MI00232,R0041,Veggie Burger,Plant-based patty with avocado,11.11
-MI00233,R0042,Mushroom Swiss Burger,Beef patty with mushrooms and Swiss,13.27
-MI00234,R0042,Onion Rings,Beer-battered onion rings,12.42
-MI00235,R0042,Milkshake,Thick vanilla or chocolate shake,8.04
-MI00236,R0042,Loaded Fries,"Fries with cheese, bacon, and sour cream",12.46
-MI00237,R0043,Crispy Chicken Burger,Breaded chicken with spicy mayo,15.37
-MI00238,R0043,Mushroom Swiss Burger,Beef patty with mushrooms and Swiss,14.91
-MI00239,R0043,Loaded Fries,"Fries with cheese, bacon, and sour cream",9.44
-MI00240,R0043,Onion Rings,Beer-battered onion rings,8.47
-MI00241,R0043,Veggie Burger,Plant-based patty with avocado,15.89
-MI00242,R0043,Milkshake,Thick vanilla or chocolate shake,8.00
-MI00243,R0043,Double Stack Burger,Two beef patties with cheese and sauce,19.26
-MI00244,R0044,Mushroom Swiss Burger,Beef patty with mushrooms and Swiss,18.39
-MI00245,R0044,Onion Rings,Beer-battered onion rings,11.05
-MI00246,R0044,Milkshake,Thick vanilla or chocolate shake,8.00
-MI00247,R0044,Veggie Burger,Plant-based patty with avocado,17.71
-MI00248,R0044,Crispy Chicken Burger,Breaded chicken with spicy mayo,12.84
-MI00249,R0044,Double Stack Burger,Two beef patties with cheese and sauce,14.08
-MI00250,R0044,Loaded Fries,"Fries with cheese, bacon, and sour cream",10.66
-MI00251,R0045,Veggie Burger,Plant-based patty with avocado,17.69
-MI00252,R0045,Mushroom Swiss Burger,Beef patty with mushrooms and Swiss,16.98
-MI00253,R0045,Double Stack Burger,Two beef patties with cheese and sauce,19.51
-MI00254,R0045,Crispy Chicken Burger,Breaded chicken with spicy mayo,18.80
-MI00255,R0045,Loaded Fries,"Fries with cheese, bacon, and sour cream",14.49
-MI00256,R0045,Onion Rings,Beer-battered onion rings,9.40
-MI00257,R0045,Milkshake,Thick vanilla or chocolate shake,12.12
-MI00258,R0046,Spicy Tuna Roll,Tuna with spicy mayo and tempura flakes,11.78
-MI00259,R0046,Edamame,Steamed soybeans with sea salt,8.00
-MI00260,R0046,Dragon Roll,"Eel, cucumber, topped with avocado",15.27
-MI00261,R0046,Salmon Nigiri,Fresh salmon over seasoned rice,15.92
-MI00262,R0047,Salmon Nigiri,Fresh salmon over seasoned rice,12.36
-MI00263,R0047,California Roll,"Crab, avocado, and cucumber roll",14.36
-MI00264,R0047,Sashimi Platter,Assorted fresh raw fish,25.89
-MI00265,R0047,Dragon Roll,"Eel, cucumber, topped with avocado",17.27
-MI00266,R0047,Miso Soup,Traditional soybean soup,11.95
-MI00267,R0047,Spicy Tuna Roll,Tuna with spicy mayo and tempura flakes,17.33
-MI00268,R0047,Edamame,Steamed soybeans with sea salt,8.00
-MI00269,R0048,Sashimi Platter,Assorted fresh raw fish,25.19
-MI00270,R0048,Dragon Roll,"Eel, cucumber, topped with avocado",17.62
-MI00271,R0048,Salmon Nigiri,Fresh salmon over seasoned rice,12.36
-MI00272,R0048,Spicy Tuna Roll,Tuna with spicy mayo and tempura flakes,17.85
-MI00273,R0048,California Roll,"Crab, avocado, and cucumber roll",11.12
-MI00274,R0049,Miso Soup,Traditional soybean soup,9.81
-MI00275,R0049,Spicy Tuna Roll,Tuna with spicy mayo and tempura flakes,11.13
-MI00276,R0049,Sashimi Platter,Assorted fresh raw fish,24.25
-MI00277,R0049,California Roll,"Crab, avocado, and cucumber roll",13.30
-MI00278,R0049,Edamame,Steamed soybeans with sea salt,8.00
-MI00279,R0049,Dragon Roll,"Eel, cucumber, topped with avocado",17.93
-MI00280,R0049,Salmon Nigiri,Fresh salmon over seasoned rice,16.40
-MI00281,R0050,Edamame,Steamed soybeans with sea salt,8.43
-MI00282,R0050,Salmon Nigiri,Fresh salmon over seasoned rice,13.72
-MI00283,R0050,California Roll,"Crab, avocado, and cucumber roll",16.97
-MI00284,R0050,Spicy Tuna Roll,Tuna with spicy mayo and tempura flakes,15.90
+MI00001,R0001,Butter Naan,Tandoor-baked naan brushed with butter,49
+MI00002,R0001,Dal Makhani,Slow-cooked black lentils with butter,249
+MI00003,R0001,Butter Chicken,Creamy tomato gravy with tandoori chicken,329
+MI00004,R0001,Paneer Lababdar,Rich tomato gravy with paneer cubes,289
+MI00005,R0002,Veg Thali,North Indian combo meal with roti and rice,269
+MI00006,R0002,Butter Chicken,Creamy tomato gravy with tandoori chicken,329
+MI00007,R0002,Paneer Lababdar,Rich tomato gravy with paneer cubes,289
+MI00008,R0002,Dal Makhani,Slow-cooked black lentils with butter,249
+MI00009,R0003,Podi Dosa,Dosa dusted with podi masala,159
+MI00010,R0003,Idli Vada Combo,Steamed idlis with vada and chutneys,129
+MI00011,R0003,Masala Dosa,Crisp dosa with potato filling,149
+MI00012,R0003,Mini Tiffin,Assorted breakfast platter,189
+MI00013,R0004,Mini Tiffin,Assorted breakfast platter,189
+MI00014,R0004,Masala Dosa,Crisp dosa with potato filling,149
+MI00015,R0004,Idli Vada Combo,Steamed idlis with vada and chutneys,129
+MI00016,R0004,Podi Dosa,Dosa dusted with podi masala,159
+MI00017,R0005,Double Ka Meetha,Traditional Hyderabadi dessert,99
+MI00018,R0005,Mutton Biryani,Slow-cooked biryani with tender mutton,379
+MI00019,R0005,Paneer Biryani,Fragrant rice layered with paneer masala,259
+MI00020,R0005,Mirchi Ka Salan,Spicy peanut-coconut curry,79
+MI00021,R0006,Paneer Biryani,Fragrant rice layered with paneer masala,259
+MI00022,R0006,Chicken Dum Biryani,Hyderabadi-style chicken biryani,299
+MI00023,R0006,Mutton Biryani,Slow-cooked biryani with tender mutton,379
+MI00024,R0006,Double Ka Meetha,Traditional Hyderabadi dessert,99
+MI00025,R0006,Mirchi Ka Salan,Spicy peanut-coconut curry,79
+MI00026,R0007,Chicken Shawarma Roll,Loaded shawarma with garlic mayo,189
+MI00027,R0007,Paneer Kathi Roll,Roomali roll stuffed with paneer tikka,169
+MI00028,R0007,Pav Bhaji,Buttery bhaji served with pav,149
+MI00029,R0007,Chicken Momos,Juicy steamed chicken momos,149
+MI00030,R0008,Veg Momos,Steamed momos with red chutney,129
+MI00031,R0008,Paneer Kathi Roll,Roomali roll stuffed with paneer tikka,169
+MI00032,R0008,Chicken Momos,Juicy steamed chicken momos,149
+MI00033,R0008,Chicken Shawarma Roll,Loaded shawarma with garlic mayo,189
+MI00034,R0008,Pav Bhaji,Buttery bhaji served with pav,149
+MI00035,R0009,Raj Kachori,Crisp kachori loaded with chaat toppings,139
+MI00036,R0009,Sev Puri,Mumbai-style street snack,99
+MI00037,R0009,Papdi Chaat,"Papdi with potatoes, curd, and chutneys",109
+MI00038,R0009,Dahi Puri,Crispy puris with curd and chutneys,119
+MI00039,R0009,Pani Puri Kit,Take-home golgappa set,129
+MI00040,R0010,Sev Puri,Mumbai-style street snack,99
+MI00041,R0010,Pani Puri Kit,Take-home golgappa set,129
+MI00042,R0010,Dahi Puri,Crispy puris with curd and chutneys,119
+MI00043,R0010,Papdi Chaat,"Papdi with potatoes, curd, and chutneys",109
+MI00044,R0010,Raj Kachori,Crisp kachori loaded with chaat toppings,139
+MI00045,R0011,Rasmalai,Soft rasmalai in saffron milk,109
+MI00046,R0011,Matka Kulfi,Traditional kulfi served in clay pot,99
+MI00047,R0011,Falooda,Rose falooda with ice cream,149
+MI00048,R0011,Chocolate Brownie,Brownie with hot chocolate sauce,139
+MI00049,R0011,Gulab Jamun,Warm gulab jamun with syrup,89
+MI00050,R0012,Matka Kulfi,Traditional kulfi served in clay pot,99
+MI00051,R0012,Gulab Jamun,Warm gulab jamun with syrup,89
+MI00052,R0012,Chocolate Brownie,Brownie with hot chocolate sauce,139
+MI00053,R0012,Falooda,Rose falooda with ice cream,149
+MI00054,R0013,Chicken Keema Pizza,Spiced keema pizza with cheese,299
+MI00055,R0013,Garlic Breadsticks,Garlicky breadsticks with dip,119
+MI00056,R0013,Choco Lava Cake,Warm chocolate-filled cake,99
+MI00057,R0013,Paneer Tikka Pizza,Pizza topped with paneer tikka and onions,279
+MI00058,R0013,Farmhouse Pizza,"Capsicum, mushroom, onion, tomato",259
+MI00059,R0014,Choco Lava Cake,Warm chocolate-filled cake,99
+MI00060,R0014,Paneer Tikka Pizza,Pizza topped with paneer tikka and onions,279
+MI00061,R0014,Chicken Keema Pizza,Spiced keema pizza with cheese,299
+MI00062,R0014,Farmhouse Pizza,"Capsicum, mushroom, onion, tomato",259
+MI00063,R0014,Garlic Breadsticks,Garlicky breadsticks with dip,119
+MI00064,R0015,Aloo Tikki Burger,Classic Indian veg burger,129
+MI00065,R0015,Cold Coffee,Iced coffee with vanilla ice cream,119
+MI00066,R0015,Chicken Maharaja Burger,Double chicken burger with signature sauce,229
+MI00067,R0015,Peri Peri Paneer Burger,Paneer patty with peri peri sauce,179
+MI00068,R0015,Masala Fries,Fries tossed in Indian spice mix,99
+MI00069,R0016,Cold Coffee,Iced coffee with vanilla ice cream,119
+MI00070,R0016,Chicken Maharaja Burger,Double chicken burger with signature sauce,229
+MI00071,R0016,Peri Peri Paneer Burger,Paneer patty with peri peri sauce,179
+MI00072,R0016,Aloo Tikki Burger,Classic Indian veg burger,129
+MI00073,R0016,Masala Fries,Fries tossed in Indian spice mix,99
+MI00074,R0017,Schezwan Momos,Momos tossed in schezwan sauce,159
+MI00075,R0017,Chicken Manchurian,Juicy chicken balls in gravy,219
+MI00076,R0017,Chilli Paneer,Paneer tossed in spicy chilli sauce,189
+MI00077,R0017,Veg Hakka Noodles,Indo-Chinese wok tossed noodles,169
+MI00078,R0017,Chicken Fried Rice,Classic fried rice with chicken,199
+MI00079,R0018,Chicken Manchurian,Juicy chicken balls in gravy,219
+MI00080,R0018,Schezwan Momos,Momos tossed in schezwan sauce,159
+MI00081,R0018,Chilli Paneer,Paneer tossed in spicy chilli sauce,189
+MI00082,R0018,Chicken Fried Rice,Classic fried rice with chicken,199
+MI00083,R0019,Greek Yogurt Parfait,"Yogurt, fruit, and granola",159
+MI00084,R0019,Cold Pressed Juice,Seasonal fruit and veggie juice,129
+MI00085,R0019,Paneer Quinoa Bowl,High-protein bowl with paneer and quinoa,249
+MI00086,R0019,Chicken Millet Bowl,Millet bowl with grilled chicken,279
+MI00087,R0019,Sprouts Chaat,Protein-rich sprout salad,149
+MI00088,R0020,Chicken Millet Bowl,Millet bowl with grilled chicken,279
+MI00089,R0020,Greek Yogurt Parfait,"Yogurt, fruit, and granola",159
+MI00090,R0020,Paneer Quinoa Bowl,High-protein bowl with paneer and quinoa,249
+MI00091,R0020,Sprouts Chaat,Protein-rich sprout salad,149
+MI00092,R0020,Cold Pressed Juice,Seasonal fruit and veggie juice,129
+MI00093,R0021,Veg Thali,North Indian combo meal with roti and rice,269
+MI00094,R0021,Butter Naan,Tandoor-baked naan brushed with butter,49
+MI00095,R0021,Butter Chicken,Creamy tomato gravy with tandoori chicken,329
+MI00096,R0021,Paneer Lababdar,Rich tomato gravy with paneer cubes,289
+MI00097,R0022,Veg Thali,North Indian combo meal with roti and rice,269
+MI00098,R0022,Butter Naan,Tandoor-baked naan brushed with butter,49
+MI00099,R0022,Paneer Lababdar,Rich tomato gravy with paneer cubes,289
+MI00100,R0022,Dal Makhani,Slow-cooked black lentils with butter,249
+MI00101,R0023,Mini Tiffin,Assorted breakfast platter,189
+MI00102,R0023,Filter Coffee,South Indian filter kaapi,59
+MI00103,R0023,Idli Vada Combo,Steamed idlis with vada and chutneys,129
+MI00104,R0023,Podi Dosa,Dosa dusted with podi masala,159
+MI00105,R0023,Masala Dosa,Crisp dosa with potato filling,149
+MI00106,R0024,Filter Coffee,South Indian filter kaapi,59
+MI00107,R0024,Masala Dosa,Crisp dosa with potato filling,149
+MI00108,R0024,Podi Dosa,Dosa dusted with podi masala,159
+MI00109,R0024,Mini Tiffin,Assorted breakfast platter,189
+MI00110,R0025,Paneer Biryani,Fragrant rice layered with paneer masala,259
+MI00111,R0025,Double Ka Meetha,Traditional Hyderabadi dessert,99
+MI00112,R0025,Mirchi Ka Salan,Spicy peanut-coconut curry,79
+MI00113,R0025,Chicken Dum Biryani,Hyderabadi-style chicken biryani,299
+MI00114,R0025,Mutton Biryani,Slow-cooked biryani with tender mutton,379
+MI00115,R0026,Chicken Dum Biryani,Hyderabadi-style chicken biryani,299
+MI00116,R0026,Double Ka Meetha,Traditional Hyderabadi dessert,99
+MI00117,R0026,Paneer Biryani,Fragrant rice layered with paneer masala,259
+MI00118,R0026,Mutton Biryani,Slow-cooked biryani with tender mutton,379
+MI00119,R0027,Chicken Momos,Juicy steamed chicken momos,149
+MI00120,R0027,Pav Bhaji,Buttery bhaji served with pav,149
+MI00121,R0027,Chicken Shawarma Roll,Loaded shawarma with garlic mayo,189
+MI00122,R0027,Veg Momos,Steamed momos with red chutney,129
+MI00123,R0028,Chicken Momos,Juicy steamed chicken momos,149
+MI00124,R0028,Paneer Kathi Roll,Roomali roll stuffed with paneer tikka,169
+MI00125,R0028,Veg Momos,Steamed momos with red chutney,129
+MI00126,R0028,Chicken Shawarma Roll,Loaded shawarma with garlic mayo,189
+MI00127,R0028,Pav Bhaji,Buttery bhaji served with pav,149
+MI00128,R0029,Pani Puri Kit,Take-home golgappa set,129
+MI00129,R0029,Sev Puri,Mumbai-style street snack,99
+MI00130,R0029,Dahi Puri,Crispy puris with curd and chutneys,119
+MI00131,R0029,Raj Kachori,Crisp kachori loaded with chaat toppings,139
+MI00132,R0030,Papdi Chaat,"Papdi with potatoes, curd, and chutneys",109
+MI00133,R0030,Sev Puri,Mumbai-style street snack,99
+MI00134,R0030,Dahi Puri,Crispy puris with curd and chutneys,119
+MI00135,R0030,Pani Puri Kit,Take-home golgappa set,129
+MI00136,R0030,Raj Kachori,Crisp kachori loaded with chaat toppings,139
+MI00137,R0031,Matka Kulfi,Traditional kulfi served in clay pot,99
+MI00138,R0031,Rasmalai,Soft rasmalai in saffron milk,109
+MI00139,R0031,Gulab Jamun,Warm gulab jamun with syrup,89
+MI00140,R0031,Chocolate Brownie,Brownie with hot chocolate sauce,139
+MI00141,R0031,Falooda,Rose falooda with ice cream,149
+MI00142,R0032,Rasmalai,Soft rasmalai in saffron milk,109
+MI00143,R0032,Matka Kulfi,Traditional kulfi served in clay pot,99
+MI00144,R0032,Falooda,Rose falooda with ice cream,149
+MI00145,R0032,Chocolate Brownie,Brownie with hot chocolate sauce,139
+MI00146,R0033,Chicken Keema Pizza,Spiced keema pizza with cheese,299
+MI00147,R0033,Choco Lava Cake,Warm chocolate-filled cake,99
+MI00148,R0033,Farmhouse Pizza,"Capsicum, mushroom, onion, tomato",259
+MI00149,R0033,Garlic Breadsticks,Garlicky breadsticks with dip,119
+MI00150,R0033,Paneer Tikka Pizza,Pizza topped with paneer tikka and onions,279
+MI00151,R0034,Garlic Breadsticks,Garlicky breadsticks with dip,119
+MI00152,R0034,Chicken Keema Pizza,Spiced keema pizza with cheese,299
+MI00153,R0034,Paneer Tikka Pizza,Pizza topped with paneer tikka and onions,279
+MI00154,R0034,Farmhouse Pizza,"Capsicum, mushroom, onion, tomato",259
+MI00155,R0034,Choco Lava Cake,Warm chocolate-filled cake,99
+MI00156,R0035,Masala Fries,Fries tossed in Indian spice mix,99
+MI00157,R0035,Chicken Maharaja Burger,Double chicken burger with signature sauce,229
+MI00158,R0035,Peri Peri Paneer Burger,Paneer patty with peri peri sauce,179
+MI00159,R0035,Cold Coffee,Iced coffee with vanilla ice cream,119
+MI00160,R0036,Chicken Maharaja Burger,Double chicken burger with signature sauce,229
+MI00161,R0036,Cold Coffee,Iced coffee with vanilla ice cream,119
+MI00162,R0036,Masala Fries,Fries tossed in Indian spice mix,99
+MI00163,R0036,Peri Peri Paneer Burger,Paneer patty with peri peri sauce,179
+MI00164,R0036,Aloo Tikki Burger,Classic Indian veg burger,129
+MI00165,R0037,Chicken Fried Rice,Classic fried rice with chicken,199
+MI00166,R0037,Schezwan Momos,Momos tossed in schezwan sauce,159
+MI00167,R0037,Chicken Manchurian,Juicy chicken balls in gravy,219
+MI00168,R0037,Chilli Paneer,Paneer tossed in spicy chilli sauce,189
+MI00169,R0037,Veg Hakka Noodles,Indo-Chinese wok tossed noodles,169
+MI00170,R0038,Chilli Paneer,Paneer tossed in spicy chilli sauce,189
+MI00171,R0038,Veg Hakka Noodles,Indo-Chinese wok tossed noodles,169
+MI00172,R0038,Schezwan Momos,Momos tossed in schezwan sauce,159
+MI00173,R0038,Chicken Fried Rice,Classic fried rice with chicken,199
+MI00174,R0039,Paneer Quinoa Bowl,High-protein bowl with paneer and quinoa,249
+MI00175,R0039,Cold Pressed Juice,Seasonal fruit and veggie juice,129
+MI00176,R0039,Sprouts Chaat,Protein-rich sprout salad,149
+MI00177,R0039,Chicken Millet Bowl,Millet bowl with grilled chicken,279
+MI00178,R0040,Chicken Millet Bowl,Millet bowl with grilled chicken,279
+MI00179,R0040,Sprouts Chaat,Protein-rich sprout salad,149
+MI00180,R0040,Cold Pressed Juice,Seasonal fruit and veggie juice,129
+MI00181,R0040,Greek Yogurt Parfait,"Yogurt, fruit, and granola",159
+MI00182,R0040,Paneer Quinoa Bowl,High-protein bowl with paneer and quinoa,249
+MI00183,R0041,Butter Chicken,Creamy tomato gravy with tandoori chicken,329
+MI00184,R0041,Dal Makhani,Slow-cooked black lentils with butter,249
+MI00185,R0041,Veg Thali,North Indian combo meal with roti and rice,269
+MI00186,R0041,Paneer Lababdar,Rich tomato gravy with paneer cubes,289
+MI00187,R0041,Butter Naan,Tandoor-baked naan brushed with butter,49
+MI00188,R0042,Paneer Lababdar,Rich tomato gravy with paneer cubes,289
+MI00189,R0042,Butter Naan,Tandoor-baked naan brushed with butter,49
+MI00190,R0042,Veg Thali,North Indian combo meal with roti and rice,269
+MI00191,R0042,Butter Chicken,Creamy tomato gravy with tandoori chicken,329
+MI00192,R0043,Mini Tiffin,Assorted breakfast platter,189
+MI00193,R0043,Filter Coffee,South Indian filter kaapi,59
+MI00194,R0043,Podi Dosa,Dosa dusted with podi masala,159
+MI00195,R0043,Idli Vada Combo,Steamed idlis with vada and chutneys,129
+MI00196,R0044,Filter Coffee,South Indian filter kaapi,59
+MI00197,R0044,Idli Vada Combo,Steamed idlis with vada and chutneys,129
+MI00198,R0044,Podi Dosa,Dosa dusted with podi masala,159
+MI00199,R0044,Mini Tiffin,Assorted breakfast platter,189
+MI00200,R0044,Masala Dosa,Crisp dosa with potato filling,149
+MI00201,R0045,Chicken Dum Biryani,Hyderabadi-style chicken biryani,299
+MI00202,R0045,Mirchi Ka Salan,Spicy peanut-coconut curry,79
+MI00203,R0045,Paneer Biryani,Fragrant rice layered with paneer masala,259
+MI00204,R0045,Mutton Biryani,Slow-cooked biryani with tender mutton,379
+MI00205,R0045,Double Ka Meetha,Traditional Hyderabadi dessert,99
+MI00206,R0046,Mutton Biryani,Slow-cooked biryani with tender mutton,379
+MI00207,R0046,Paneer Biryani,Fragrant rice layered with paneer masala,259
+MI00208,R0046,Double Ka Meetha,Traditional Hyderabadi dessert,99
+MI00209,R0046,Mirchi Ka Salan,Spicy peanut-coconut curry,79
+MI00210,R0046,Chicken Dum Biryani,Hyderabadi-style chicken biryani,299
+MI00211,R0047,Chicken Shawarma Roll,Loaded shawarma with garlic mayo,189
+MI00212,R0047,Pav Bhaji,Buttery bhaji served with pav,149
+MI00213,R0047,Chicken Momos,Juicy steamed chicken momos,149
+MI00214,R0047,Paneer Kathi Roll,Roomali roll stuffed with paneer tikka,169
+MI00215,R0047,Veg Momos,Steamed momos with red chutney,129
+MI00216,R0048,Chicken Momos,Juicy steamed chicken momos,149
+MI00217,R0048,Paneer Kathi Roll,Roomali roll stuffed with paneer tikka,169
+MI00218,R0048,Pav Bhaji,Buttery bhaji served with pav,149
+MI00219,R0048,Veg Momos,Steamed momos with red chutney,129
+MI00220,R0048,Chicken Shawarma Roll,Loaded shawarma with garlic mayo,189
+MI00221,R0049,Sev Puri,Mumbai-style street snack,99
+MI00222,R0049,Papdi Chaat,"Papdi with potatoes, curd, and chutneys",109
+MI00223,R0049,Raj Kachori,Crisp kachori loaded with chaat toppings,139
+MI00224,R0049,Dahi Puri,Crispy puris with curd and chutneys,119
+MI00225,R0050,Papdi Chaat,"Papdi with potatoes, curd, and chutneys",109
+MI00226,R0050,Dahi Puri,Crispy puris with curd and chutneys,119
+MI00227,R0050,Sev Puri,Mumbai-style street snack,99
+MI00228,R0050,Raj Kachori,Crisp kachori loaded with chaat toppings,139
+MI00229,R0051,Chocolate Brownie,Brownie with hot chocolate sauce,139
+MI00230,R0051,Matka Kulfi,Traditional kulfi served in clay pot,99
+MI00231,R0051,Gulab Jamun,Warm gulab jamun with syrup,89
+MI00232,R0051,Rasmalai,Soft rasmalai in saffron milk,109
+MI00233,R0052,Falooda,Rose falooda with ice cream,149
+MI00234,R0052,Matka Kulfi,Traditional kulfi served in clay pot,99
+MI00235,R0052,Gulab Jamun,Warm gulab jamun with syrup,89
+MI00236,R0052,Chocolate Brownie,Brownie with hot chocolate sauce,139
+MI00237,R0052,Rasmalai,Soft rasmalai in saffron milk,109
+MI00238,R0053,Garlic Breadsticks,Garlicky breadsticks with dip,119
+MI00239,R0053,Paneer Tikka Pizza,Pizza topped with paneer tikka and onions,279
+MI00240,R0053,Choco Lava Cake,Warm chocolate-filled cake,99
+MI00241,R0053,Chicken Keema Pizza,Spiced keema pizza with cheese,299
+MI00242,R0054,Farmhouse Pizza,"Capsicum, mushroom, onion, tomato",259
+MI00243,R0054,Chicken Keema Pizza,Spiced keema pizza with cheese,299
+MI00244,R0054,Garlic Breadsticks,Garlicky breadsticks with dip,119
+MI00245,R0054,Paneer Tikka Pizza,Pizza topped with paneer tikka and onions,279
+MI00246,R0055,Peri Peri Paneer Burger,Paneer patty with peri peri sauce,179
+MI00247,R0055,Masala Fries,Fries tossed in Indian spice mix,99
+MI00248,R0055,Cold Coffee,Iced coffee with vanilla ice cream,119
+MI00249,R0055,Aloo Tikki Burger,Classic Indian veg burger,129
+MI00250,R0056,Masala Fries,Fries tossed in Indian spice mix,99
+MI00251,R0056,Peri Peri Paneer Burger,Paneer patty with peri peri sauce,179
+MI00252,R0056,Cold Coffee,Iced coffee with vanilla ice cream,119
+MI00253,R0056,Chicken Maharaja Burger,Double chicken burger with signature sauce,229
+MI00254,R0057,Schezwan Momos,Momos tossed in schezwan sauce,159
+MI00255,R0057,Veg Hakka Noodles,Indo-Chinese wok tossed noodles,169
+MI00256,R0057,Chicken Manchurian,Juicy chicken balls in gravy,219
+MI00257,R0057,Chicken Fried Rice,Classic fried rice with chicken,199
+MI00258,R0058,Schezwan Momos,Momos tossed in schezwan sauce,159
+MI00259,R0058,Veg Hakka Noodles,Indo-Chinese wok tossed noodles,169
+MI00260,R0058,Chicken Manchurian,Juicy chicken balls in gravy,219
+MI00261,R0058,Chilli Paneer,Paneer tossed in spicy chilli sauce,189
+MI00262,R0058,Chicken Fried Rice,Classic fried rice with chicken,199
+MI00263,R0059,Greek Yogurt Parfait,"Yogurt, fruit, and granola",159
+MI00264,R0059,Paneer Quinoa Bowl,High-protein bowl with paneer and quinoa,249
+MI00265,R0059,Cold Pressed Juice,Seasonal fruit and veggie juice,129
+MI00266,R0059,Sprouts Chaat,Protein-rich sprout salad,149
+MI00267,R0059,Chicken Millet Bowl,Millet bowl with grilled chicken,279
+MI00268,R0060,Sprouts Chaat,Protein-rich sprout salad,149
+MI00269,R0060,Cold Pressed Juice,Seasonal fruit and veggie juice,129
+MI00270,R0060,Greek Yogurt Parfait,"Yogurt, fruit, and granola",159
+MI00271,R0060,Paneer Quinoa Bowl,High-protein bowl with paneer and quinoa,249
+MI00272,R0061,Butter Naan,Tandoor-baked naan brushed with butter,49
+MI00273,R0061,Dal Makhani,Slow-cooked black lentils with butter,249
+MI00274,R0061,Veg Thali,North Indian combo meal with roti and rice,269
+MI00275,R0061,Paneer Lababdar,Rich tomato gravy with paneer cubes,289
+MI00276,R0061,Butter Chicken,Creamy tomato gravy with tandoori chicken,329
+MI00277,R0062,Paneer Lababdar,Rich tomato gravy with paneer cubes,289
+MI00278,R0062,Butter Chicken,Creamy tomato gravy with tandoori chicken,329
+MI00279,R0062,Butter Naan,Tandoor-baked naan brushed with butter,49
+MI00280,R0062,Dal Makhani,Slow-cooked black lentils with butter,249
+MI00281,R0063,Podi Dosa,Dosa dusted with podi masala,159
+MI00282,R0063,Mini Tiffin,Assorted breakfast platter,189
+MI00283,R0063,Idli Vada Combo,Steamed idlis with vada and chutneys,129
+MI00284,R0063,Filter Coffee,South Indian filter kaapi,59
+MI00285,R0064,Idli Vada Combo,Steamed idlis with vada and chutneys,129
+MI00286,R0064,Filter Coffee,South Indian filter kaapi,59
+MI00287,R0064,Podi Dosa,Dosa dusted with podi masala,159
+MI00288,R0064,Mini Tiffin,Assorted breakfast platter,189
+MI00289,R0064,Masala Dosa,Crisp dosa with potato filling,149
+MI00290,R0065,Double Ka Meetha,Traditional Hyderabadi dessert,99
+MI00291,R0065,Mutton Biryani,Slow-cooked biryani with tender mutton,379
+MI00292,R0065,Mirchi Ka Salan,Spicy peanut-coconut curry,79
+MI00293,R0065,Paneer Biryani,Fragrant rice layered with paneer masala,259
+MI00294,R0066,Mirchi Ka Salan,Spicy peanut-coconut curry,79
+MI00295,R0066,Mutton Biryani,Slow-cooked biryani with tender mutton,379
+MI00296,R0066,Paneer Biryani,Fragrant rice layered with paneer masala,259
+MI00297,R0066,Chicken Dum Biryani,Hyderabadi-style chicken biryani,299
+MI00298,R0067,Veg Momos,Steamed momos with red chutney,129
+MI00299,R0067,Chicken Shawarma Roll,Loaded shawarma with garlic mayo,189
+MI00300,R0067,Chicken Momos,Juicy steamed chicken momos,149
+MI00301,R0067,Pav Bhaji,Buttery bhaji served with pav,149
+MI00302,R0067,Paneer Kathi Roll,Roomali roll stuffed with paneer tikka,169
+MI00303,R0068,Paneer Kathi Roll,Roomali roll stuffed with paneer tikka,169
+MI00304,R0068,Chicken Shawarma Roll,Loaded shawarma with garlic mayo,189
+MI00305,R0068,Veg Momos,Steamed momos with red chutney,129
+MI00306,R0068,Pav Bhaji,Buttery bhaji served with pav,149
+MI00307,R0069,Raj Kachori,Crisp kachori loaded with chaat toppings,139
+MI00308,R0069,Sev Puri,Mumbai-style street snack,99
+MI00309,R0069,Papdi Chaat,"Papdi with potatoes, curd, and chutneys",109
+MI00310,R0069,Pani Puri Kit,Take-home golgappa set,129
+MI00311,R0070,Sev Puri,Mumbai-style street snack,99
+MI00312,R0070,Dahi Puri,Crispy puris with curd and chutneys,119
+MI00313,R0070,Pani Puri Kit,Take-home golgappa set,129
+MI00314,R0070,Raj Kachori,Crisp kachori loaded with chaat toppings,139
+MI00315,R0071,Rasmalai,Soft rasmalai in saffron milk,109
+MI00316,R0071,Gulab Jamun,Warm gulab jamun with syrup,89
+MI00317,R0071,Matka Kulfi,Traditional kulfi served in clay pot,99
+MI00318,R0071,Chocolate Brownie,Brownie with hot chocolate sauce,139
+MI00319,R0071,Falooda,Rose falooda with ice cream,149
+MI00320,R0072,Rasmalai,Soft rasmalai in saffron milk,109
+MI00321,R0072,Falooda,Rose falooda with ice cream,149
+MI00322,R0072,Chocolate Brownie,Brownie with hot chocolate sauce,139
+MI00323,R0072,Matka Kulfi,Traditional kulfi served in clay pot,99
+MI00324,R0073,Farmhouse Pizza,"Capsicum, mushroom, onion, tomato",259
+MI00325,R0073,Garlic Breadsticks,Garlicky breadsticks with dip,119
+MI00326,R0073,Chicken Keema Pizza,Spiced keema pizza with cheese,299
+MI00327,R0073,Choco Lava Cake,Warm chocolate-filled cake,99
+MI00328,R0073,Paneer Tikka Pizza,Pizza topped with paneer tikka and onions,279
+MI00329,R0074,Choco Lava Cake,Warm chocolate-filled cake,99
+MI00330,R0074,Chicken Keema Pizza,Spiced keema pizza with cheese,299
+MI00331,R0074,Garlic Breadsticks,Garlicky breadsticks with dip,119
+MI00332,R0074,Paneer Tikka Pizza,Pizza topped with paneer tikka and onions,279
+MI00333,R0075,Cold Coffee,Iced coffee with vanilla ice cream,119
+MI00334,R0075,Masala Fries,Fries tossed in Indian spice mix,99
+MI00335,R0075,Peri Peri Paneer Burger,Paneer patty with peri peri sauce,179
+MI00336,R0075,Aloo Tikki Burger,Classic Indian veg burger,129
+MI00337,R0076,Masala Fries,Fries tossed in Indian spice mix,99
+MI00338,R0076,Chicken Maharaja Burger,Double chicken burger with signature sauce,229
+MI00339,R0076,Peri Peri Paneer Burger,Paneer patty with peri peri sauce,179
+MI00340,R0076,Cold Coffee,Iced coffee with vanilla ice cream,119
+MI00341,R0076,Aloo Tikki Burger,Classic Indian veg burger,129
+MI00342,R0077,Chilli Paneer,Paneer tossed in spicy chilli sauce,189
+MI00343,R0077,Veg Hakka Noodles,Indo-Chinese wok tossed noodles,169
+MI00344,R0077,Chicken Fried Rice,Classic fried rice with chicken,199
+MI00345,R0077,Schezwan Momos,Momos tossed in schezwan sauce,159
+MI00346,R0078,Schezwan Momos,Momos tossed in schezwan sauce,159
+MI00347,R0078,Chicken Manchurian,Juicy chicken balls in gravy,219
+MI00348,R0078,Chilli Paneer,Paneer tossed in spicy chilli sauce,189
+MI00349,R0078,Chicken Fried Rice,Classic fried rice with chicken,199
+MI00350,R0079,Chicken Millet Bowl,Millet bowl with grilled chicken,279
+MI00351,R0079,Greek Yogurt Parfait,"Yogurt, fruit, and granola",159
+MI00352,R0079,Paneer Quinoa Bowl,High-protein bowl with paneer and quinoa,249
+MI00353,R0079,Sprouts Chaat,Protein-rich sprout salad,149
+MI00354,R0079,Cold Pressed Juice,Seasonal fruit and veggie juice,129
+MI00355,R0080,Paneer Quinoa Bowl,High-protein bowl with paneer and quinoa,249
+MI00356,R0080,Sprouts Chaat,Protein-rich sprout salad,149
+MI00357,R0080,Cold Pressed Juice,Seasonal fruit and veggie juice,129
+MI00358,R0080,Greek Yogurt Parfait,"Yogurt, fruit, and granola",159
+MI00359,R0081,Butter Chicken,Creamy tomato gravy with tandoori chicken,329
+MI00360,R0081,Dal Makhani,Slow-cooked black lentils with butter,249
+MI00361,R0081,Veg Thali,North Indian combo meal with roti and rice,269
+MI00362,R0081,Butter Naan,Tandoor-baked naan brushed with butter,49
+MI00363,R0081,Paneer Lababdar,Rich tomato gravy with paneer cubes,289
+MI00364,R0082,Veg Thali,North Indian combo meal with roti and rice,269
+MI00365,R0082,Butter Chicken,Creamy tomato gravy with tandoori chicken,329
+MI00366,R0082,Butter Naan,Tandoor-baked naan brushed with butter,49
+MI00367,R0082,Paneer Lababdar,Rich tomato gravy with paneer cubes,289
+MI00368,R0083,Idli Vada Combo,Steamed idlis with vada and chutneys,129
+MI00369,R0083,Mini Tiffin,Assorted breakfast platter,189
+MI00370,R0083,Masala Dosa,Crisp dosa with potato filling,149
+MI00371,R0083,Podi Dosa,Dosa dusted with podi masala,159
+MI00372,R0084,Podi Dosa,Dosa dusted with podi masala,159
+MI00373,R0084,Mini Tiffin,Assorted breakfast platter,189
+MI00374,R0084,Filter Coffee,South Indian filter kaapi,59
+MI00375,R0084,Masala Dosa,Crisp dosa with potato filling,149
+MI00376,R0084,Idli Vada Combo,Steamed idlis with vada and chutneys,129
+MI00377,R0085,Paneer Biryani,Fragrant rice layered with paneer masala,259
+MI00378,R0085,Mutton Biryani,Slow-cooked biryani with tender mutton,379
+MI00379,R0085,Mirchi Ka Salan,Spicy peanut-coconut curry,79
+MI00380,R0085,Chicken Dum Biryani,Hyderabadi-style chicken biryani,299
+MI00381,R0085,Double Ka Meetha,Traditional Hyderabadi dessert,99
+MI00382,R0086,Mutton Biryani,Slow-cooked biryani with tender mutton,379
+MI00383,R0086,Paneer Biryani,Fragrant rice layered with paneer masala,259
+MI00384,R0086,Chicken Dum Biryani,Hyderabadi-style chicken biryani,299
+MI00385,R0086,Mirchi Ka Salan,Spicy peanut-coconut curry,79
+MI00386,R0087,Paneer Kathi Roll,Roomali roll stuffed with paneer tikka,169
+MI00387,R0087,Pav Bhaji,Buttery bhaji served with pav,149
+MI00388,R0087,Veg Momos,Steamed momos with red chutney,129
+MI00389,R0087,Chicken Shawarma Roll,Loaded shawarma with garlic mayo,189
+MI00390,R0088,Veg Momos,Steamed momos with red chutney,129
+MI00391,R0088,Chicken Momos,Juicy steamed chicken momos,149
+MI00392,R0088,Paneer Kathi Roll,Roomali roll stuffed with paneer tikka,169
+MI00393,R0088,Pav Bhaji,Buttery bhaji served with pav,149
+MI00394,R0088,Chicken Shawarma Roll,Loaded shawarma with garlic mayo,189
+MI00395,R0089,Raj Kachori,Crisp kachori loaded with chaat toppings,139
+MI00396,R0089,Pani Puri Kit,Take-home golgappa set,129
+MI00397,R0089,Papdi Chaat,"Papdi with potatoes, curd, and chutneys",109
+MI00398,R0089,Sev Puri,Mumbai-style street snack,99
+MI00399,R0089,Dahi Puri,Crispy puris with curd and chutneys,119
+MI00400,R0090,Pani Puri Kit,Take-home golgappa set,129
+MI00401,R0090,Dahi Puri,Crispy puris with curd and chutneys,119
+MI00402,R0090,Raj Kachori,Crisp kachori loaded with chaat toppings,139
+MI00403,R0090,Sev Puri,Mumbai-style street snack,99
+MI00404,R0090,Papdi Chaat,"Papdi with potatoes, curd, and chutneys",109
+MI00405,R0091,Matka Kulfi,Traditional kulfi served in clay pot,99
+MI00406,R0091,Chocolate Brownie,Brownie with hot chocolate sauce,139
+MI00407,R0091,Falooda,Rose falooda with ice cream,149
+MI00408,R0091,Rasmalai,Soft rasmalai in saffron milk,109
+MI00409,R0091,Gulab Jamun,Warm gulab jamun with syrup,89
+MI00410,R0092,Chocolate Brownie,Brownie with hot chocolate sauce,139
+MI00411,R0092,Gulab Jamun,Warm gulab jamun with syrup,89
+MI00412,R0092,Falooda,Rose falooda with ice cream,149
+MI00413,R0092,Matka Kulfi,Traditional kulfi served in clay pot,99
+MI00414,R0093,Choco Lava Cake,Warm chocolate-filled cake,99
+MI00415,R0093,Garlic Breadsticks,Garlicky breadsticks with dip,119
+MI00416,R0093,Chicken Keema Pizza,Spiced keema pizza with cheese,299
+MI00417,R0093,Paneer Tikka Pizza,Pizza topped with paneer tikka and onions,279
+MI00418,R0094,Paneer Tikka Pizza,Pizza topped with paneer tikka and onions,279
+MI00419,R0094,Choco Lava Cake,Warm chocolate-filled cake,99
+MI00420,R0094,Chicken Keema Pizza,Spiced keema pizza with cheese,299
+MI00421,R0094,Farmhouse Pizza,"Capsicum, mushroom, onion, tomato",259
+MI00422,R0095,Masala Fries,Fries tossed in Indian spice mix,99
+MI00423,R0095,Peri Peri Paneer Burger,Paneer patty with peri peri sauce,179
+MI00424,R0095,Aloo Tikki Burger,Classic Indian veg burger,129
+MI00425,R0095,Chicken Maharaja Burger,Double chicken burger with signature sauce,229
+MI00426,R0096,Chicken Maharaja Burger,Double chicken burger with signature sauce,229
+MI00427,R0096,Aloo Tikki Burger,Classic Indian veg burger,129
+MI00428,R0096,Masala Fries,Fries tossed in Indian spice mix,99
+MI00429,R0096,Peri Peri Paneer Burger,Paneer patty with peri peri sauce,179
+MI00430,R0097,Chicken Fried Rice,Classic fried rice with chicken,199
+MI00431,R0097,Chicken Manchurian,Juicy chicken balls in gravy,219
+MI00432,R0097,Schezwan Momos,Momos tossed in schezwan sauce,159
+MI00433,R0097,Chilli Paneer,Paneer tossed in spicy chilli sauce,189
+MI00434,R0098,Chicken Manchurian,Juicy chicken balls in gravy,219
+MI00435,R0098,Veg Hakka Noodles,Indo-Chinese wok tossed noodles,169
+MI00436,R0098,Schezwan Momos,Momos tossed in schezwan sauce,159
+MI00437,R0098,Chicken Fried Rice,Classic fried rice with chicken,199
+MI00438,R0098,Chilli Paneer,Paneer tossed in spicy chilli sauce,189
+MI00439,R0099,Chicken Millet Bowl,Millet bowl with grilled chicken,279
+MI00440,R0099,Greek Yogurt Parfait,"Yogurt, fruit, and granola",159
+MI00441,R0099,Cold Pressed Juice,Seasonal fruit and veggie juice,129
+MI00442,R0099,Paneer Quinoa Bowl,High-protein bowl with paneer and quinoa,249
+MI00443,R0099,Sprouts Chaat,Protein-rich sprout salad,149
+MI00444,R0100,Paneer Quinoa Bowl,High-protein bowl with paneer and quinoa,249
+MI00445,R0100,Sprouts Chaat,Protein-rich sprout salad,149
+MI00446,R0100,Greek Yogurt Parfait,"Yogurt, fruit, and granola",159
+MI00447,R0100,Cold Pressed Juice,Seasonal fruit and veggie juice,129
+MI00448,R0100,Chicken Millet Bowl,Millet bowl with grilled chicken,279
+MI00449,R0101,Dal Makhani,Slow-cooked black lentils with butter,249
+MI00450,R0101,Butter Chicken,Creamy tomato gravy with tandoori chicken,329
+MI00451,R0101,Butter Naan,Tandoor-baked naan brushed with butter,49
+MI00452,R0101,Paneer Lababdar,Rich tomato gravy with paneer cubes,289
+MI00453,R0101,Veg Thali,North Indian combo meal with roti and rice,269
+MI00454,R0102,Butter Chicken,Creamy tomato gravy with tandoori chicken,329
+MI00455,R0102,Dal Makhani,Slow-cooked black lentils with butter,249
+MI00456,R0102,Butter Naan,Tandoor-baked naan brushed with butter,49
+MI00457,R0102,Paneer Lababdar,Rich tomato gravy with paneer cubes,289
+MI00458,R0103,Idli Vada Combo,Steamed idlis with vada and chutneys,129
+MI00459,R0103,Mini Tiffin,Assorted breakfast platter,189
+MI00460,R0103,Filter Coffee,South Indian filter kaapi,59
+MI00461,R0103,Masala Dosa,Crisp dosa with potato filling,149
+MI00462,R0104,Mini Tiffin,Assorted breakfast platter,189
+MI00463,R0104,Filter Coffee,South Indian filter kaapi,59
+MI00464,R0104,Podi Dosa,Dosa dusted with podi masala,159
+MI00465,R0104,Idli Vada Combo,Steamed idlis with vada and chutneys,129
+MI00466,R0104,Masala Dosa,Crisp dosa with potato filling,149
+MI00467,R0105,Mutton Biryani,Slow-cooked biryani with tender mutton,379
+MI00468,R0105,Mirchi Ka Salan,Spicy peanut-coconut curry,79
+MI00469,R0105,Double Ka Meetha,Traditional Hyderabadi dessert,99
+MI00470,R0105,Paneer Biryani,Fragrant rice layered with paneer masala,259
+MI00471,R0106,Paneer Biryani,Fragrant rice layered with paneer masala,259
+MI00472,R0106,Mutton Biryani,Slow-cooked biryani with tender mutton,379
+MI00473,R0106,Mirchi Ka Salan,Spicy peanut-coconut curry,79
+MI00474,R0106,Double Ka Meetha,Traditional Hyderabadi dessert,99
+MI00475,R0106,Chicken Dum Biryani,Hyderabadi-style chicken biryani,299
+MI00476,R0107,Chicken Shawarma Roll,Loaded shawarma with garlic mayo,189
+MI00477,R0107,Chicken Momos,Juicy steamed chicken momos,149
+MI00478,R0107,Veg Momos,Steamed momos with red chutney,129
+MI00479,R0107,Pav Bhaji,Buttery bhaji served with pav,149
+MI00480,R0107,Paneer Kathi Roll,Roomali roll stuffed with paneer tikka,169
+MI00481,R0108,Veg Momos,Steamed momos with red chutney,129
+MI00482,R0108,Pav Bhaji,Buttery bhaji served with pav,149
+MI00483,R0108,Chicken Momos,Juicy steamed chicken momos,149
+MI00484,R0108,Chicken Shawarma Roll,Loaded shawarma with garlic mayo,189
+MI00485,R0109,Sev Puri,Mumbai-style street snack,99
+MI00486,R0109,Papdi Chaat,"Papdi with potatoes, curd, and chutneys",109
+MI00487,R0109,Dahi Puri,Crispy puris with curd and chutneys,119
+MI00488,R0109,Raj Kachori,Crisp kachori loaded with chaat toppings,139
+MI00489,R0110,Sev Puri,Mumbai-style street snack,99
+MI00490,R0110,Pani Puri Kit,Take-home golgappa set,129
+MI00491,R0110,Raj Kachori,Crisp kachori loaded with chaat toppings,139
+MI00492,R0110,Papdi Chaat,"Papdi with potatoes, curd, and chutneys",109
+MI00493,R0111,Falooda,Rose falooda with ice cream,149
+MI00494,R0111,Matka Kulfi,Traditional kulfi served in clay pot,99
+MI00495,R0111,Gulab Jamun,Warm gulab jamun with syrup,89
+MI00496,R0111,Chocolate Brownie,Brownie with hot chocolate sauce,139
+MI00497,R0111,Rasmalai,Soft rasmalai in saffron milk,109
+MI00498,R0112,Matka Kulfi,Traditional kulfi served in clay pot,99
+MI00499,R0112,Chocolate Brownie,Brownie with hot chocolate sauce,139
+MI00500,R0112,Rasmalai,Soft rasmalai in saffron milk,109
+MI00501,R0112,Gulab Jamun,Warm gulab jamun with syrup,89
+MI00502,R0113,Garlic Breadsticks,Garlicky breadsticks with dip,119
+MI00503,R0113,Paneer Tikka Pizza,Pizza topped with paneer tikka and onions,279
+MI00504,R0113,Chicken Keema Pizza,Spiced keema pizza with cheese,299
+MI00505,R0113,Choco Lava Cake,Warm chocolate-filled cake,99
+MI00506,R0113,Farmhouse Pizza,"Capsicum, mushroom, onion, tomato",259
+MI00507,R0114,Choco Lava Cake,Warm chocolate-filled cake,99
+MI00508,R0114,Garlic Breadsticks,Garlicky breadsticks with dip,119
+MI00509,R0114,Farmhouse Pizza,"Capsicum, mushroom, onion, tomato",259
+MI00510,R0114,Paneer Tikka Pizza,Pizza topped with paneer tikka and onions,279
+MI00511,R0114,Chicken Keema Pizza,Spiced keema pizza with cheese,299
+MI00512,R0115,Chicken Maharaja Burger,Double chicken burger with signature sauce,229
+MI00513,R0115,Aloo Tikki Burger,Classic Indian veg burger,129
+MI00514,R0115,Peri Peri Paneer Burger,Paneer patty with peri peri sauce,179
+MI00515,R0115,Cold Coffee,Iced coffee with vanilla ice cream,119
+MI00516,R0115,Masala Fries,Fries tossed in Indian spice mix,99
+MI00517,R0116,Peri Peri Paneer Burger,Paneer patty with peri peri sauce,179
+MI00518,R0116,Masala Fries,Fries tossed in Indian spice mix,99
+MI00519,R0116,Cold Coffee,Iced coffee with vanilla ice cream,119
+MI00520,R0116,Aloo Tikki Burger,Classic Indian veg burger,129
+MI00521,R0116,Chicken Maharaja Burger,Double chicken burger with signature sauce,229
+MI00522,R0117,Veg Hakka Noodles,Indo-Chinese wok tossed noodles,169
+MI00523,R0117,Schezwan Momos,Momos tossed in schezwan sauce,159
+MI00524,R0117,Chicken Fried Rice,Classic fried rice with chicken,199
+MI00525,R0117,Chicken Manchurian,Juicy chicken balls in gravy,219
+MI00526,R0117,Chilli Paneer,Paneer tossed in spicy chilli sauce,189
+MI00527,R0118,Schezwan Momos,Momos tossed in schezwan sauce,159
+MI00528,R0118,Chicken Manchurian,Juicy chicken balls in gravy,219
+MI00529,R0118,Veg Hakka Noodles,Indo-Chinese wok tossed noodles,169
+MI00530,R0118,Chicken Fried Rice,Classic fried rice with chicken,199
+MI00531,R0118,Chilli Paneer,Paneer tossed in spicy chilli sauce,189
+MI00532,R0119,Paneer Quinoa Bowl,High-protein bowl with paneer and quinoa,249
+MI00533,R0119,Greek Yogurt Parfait,"Yogurt, fruit, and granola",159
+MI00534,R0119,Sprouts Chaat,Protein-rich sprout salad,149
+MI00535,R0119,Chicken Millet Bowl,Millet bowl with grilled chicken,279
+MI00536,R0119,Cold Pressed Juice,Seasonal fruit and veggie juice,129
+MI00537,R0120,Sprouts Chaat,Protein-rich sprout salad,149
+MI00538,R0120,Paneer Quinoa Bowl,High-protein bowl with paneer and quinoa,249
+MI00539,R0120,Chicken Millet Bowl,Millet bowl with grilled chicken,279
+MI00540,R0120,Cold Pressed Juice,Seasonal fruit and veggie juice,129
+MI00541,R0120,Greek Yogurt Parfait,"Yogurt, fruit, and granola",159

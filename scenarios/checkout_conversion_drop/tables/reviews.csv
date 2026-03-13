@@ -1,51 +1,77 @@
-review_id,user_id,order_id,rating,text,platform,created_at
-REV0011,U03377,ORD002849,3,The new icon design is a bit confusing but otherwise the app works great.,android,2024-12-20 20:00:10
-REV0010,U00149,ORD007494,5,Delivery driver was super friendly. Food was perfect.,android,2024-12-26 05:01:35
-REV0006,U00215,ORD004627,4,Nice variety of cuisines. Ordered Thai food and it was great.,android,2024-12-27 02:00:11
-REV0009,U03295,ORD003827,4,"Ordered for a family dinner, everyone was happy with their meals.",web,2024-12-27 16:01:44
-REV0004,U03404,ORD004859,4,Good selection of restaurants. The app is easy to use.,ios,2024-12-27 19:43:14
-REV0003,U04727,ORD002051,5,Fast delivery and the food was still hot. Excellent service!,ios,2024-12-30 00:51:15
-REV0008,U04996,ORD005619,3,Food was good but the search results seem a bit off sometimes. Hard to find specific dishes.,android,2025-01-02 18:30:53
-REV0012,U01877,ORD006199,4,Solid delivery experience. Will order again.,android,2025-01-04 18:39:51
-REV0005,U00270,ORD008156,5,Best delivery app I've used. Always on time.,android,2025-01-04 20:40:06
-REV0001,U03297,ORD001917,5,Great food delivery! Love how fast it arrived.,ios,2025-01-05 11:35:53
-REV0007,U04032,ORD004276,5,Love the app! The tracking feature is super helpful.,web,2025-01-05 19:17:47
-REV0002,U00441,ORD007093,4,"Really enjoying the new restaurant filters, makes browsing so much easier.",android,2025-01-08 13:27:59
-REV0014,U01750,ORD009790,2,Payment process is really slow now. Waited over a minute for it to process.,ios,2025-01-10 06:49:51
-REV0013,U00862,ORD010707,1,Payment keeps failing on my iPhone. Had to try 3 times before it went through.,ios,2025-01-10 07:42:37
-REV0016,U02001,ORD010023,4,"Ordered dinner, everything worked smoothly. Great burgers!",android,2025-01-10 09:02:25
-REV0015,U00324,ORD009668,1,Can't complete any orders! Payment always times out. Very frustrating.,ios,2025-01-10 18:47:44
-REV0020,U00941,ORD010715,5,Fast delivery as always. Love the real-time tracking.,android,2025-01-12 00:44:18
-REV0019,U01918,ORD009778,2,Payment failed twice but worked on the third try. Please fix this!,ios,2025-01-14 21:43:16
-REV0018,U01836,ORD009421,1,Apple Pay hasn't worked for me in days. Had to use my laptop to order.,ios,2025-01-15 18:03:14
-REV0017,U03077,ORD009288,2,Something is wrong with the payment. It just shows 'Something went wrong' every time.,ios,2025-01-15 23:01:14
-REV0047,U04589,ORD011873,3,Wrong order received. Got someone else's food. Support was helpful though.,android,2025-01-18 13:28:46
-REV0028,U00982,ORD011783,1,"Tried credit card and Apple Pay, neither works. What happened to this app?",ios,2025-01-18 13:43:14
-REV0043,U00818,ORD012467,4,"No issues at all. Placed 3 orders this week, all perfect.",android,2025-01-18 18:51:21
-REV0023,U01413,ORD014866,1,I've switched to UberEats because FoodDash payments never work anymore.,ios,2025-01-18 22:37:42
-REV0036,U03242,ORD011912,2,Sometimes works after 4-5 tries but usually just times out.,ios,2025-01-19 02:33:43
-REV0021,U03996,ORD013690,1,Payment times out every single time. I've given up trying to order.,ios,2025-01-19 06:30:46
-REV0044,U00341,ORD011401,1,My friend recommended this app but I literally cannot complete a single order.,ios,2025-01-19 07:23:51
-REV0031,U03205,ORD012974,1,"Every order attempt fails at checkout. iPhone 15 Pro, latest iOS.",ios,2025-01-19 09:51:37
-REV0048,U02020,ORD011459,1,"Updated the app hoping it would fix payments. Nope, still broken.",ios,2025-01-19 17:21:03
-REV0033,U00860,ORD013118,1,I literally cannot order food anymore. Payment is 100% broken on iOS.,ios,2025-01-20 01:30:56
-REV0027,U01269,ORD014565,1,"Payment fails with some generic error message. No explanation, no help.",ios,2025-01-20 14:14:47
-REV0042,U03346,ORD012926,4,"App works great on my Pixel. Quick checkout, good food.",android,2025-01-21 06:33:24
-REV0034,U02852,ORD012345,1,Switching to a competitor. Two weeks of broken payments is unacceptable.,ios,2025-01-21 10:09:49
-REV0024,U00003,ORD014312,1,Works fine on my husband's Android but my iPhone can't process any payment.,ios,2025-01-21 15:23:49
-REV0045,U01117,ORD013695,1,Payment keeps showing gateway timeout. What does that even mean?,ios,2025-01-23 08:50:23
-REV0029,U03962,ORD014237,2,Payment takes forever and then fails. Wasted 20 minutes trying to order dinner.,ios,2025-01-23 14:00:31
-REV0035,U03807,ORD014389,1,Asked my coworkers - everyone with an iPhone has this payment issue.,ios,2025-01-24 02:20:16
-REV0049,U00832,ORD011398,1,Three stars? More like zero. Payment system is completely non-functional on iOS.,ios,2025-01-24 09:03:38
-REV0032,U02325,ORD012922,2,Payment error every time. Error message just says 'Something went wrong'. Not helpful at all.,ios,2025-01-25 00:14:09
-REV0038,U03582,ORD012564,1,Apple Pay used to be so fast. Now it just spins forever and fails.,ios,2025-01-25 11:15:19
-REV0040,U03260,ORD012448,2,The checkout process is painfully slow now. Takes 30+ seconds to process.,ios,2025-01-25 14:54:06
-REV0046,U00973,ORD013143,3,Delivery was cold when it arrived. Took almost an hour.,web,2025-01-26 09:11:39
-REV0026,U03058,ORD013858,2,App freezes during payment every time. Have to force close and restart.,ios,2025-01-26 16:58:42
-REV0039,U00593,ORD013908,1,Got charged twice because the payment timed out but actually went through. Nightmare.,ios,2025-01-26 20:26:37
-REV0030,U02118,ORD012275,1,Deleted the app. Payment hasn't worked in weeks. Terrible experience.,ios,2025-01-27 06:32:35
-REV0037,U02179,ORD012234,1,Was a loyal customer for 2 years. Now I can't even place an order. Sad.,ios,2025-01-27 07:54:28
-REV0041,U01694,ORD013039,5,Ordering was smooth! Got my food in 25 minutes. Great experience.,android,2025-01-27 18:16:58
-REV0022,U04791,ORD012116,1,This app is completely broken. Can't pay for anything on my iPhone.,ios,2025-01-28 11:01:43
-REV0025,U01332,ORD014371,1,Apple Pay is completely broken. Haven't been able to order in 2 weeks.,ios,2025-01-28 15:15:23
-REV0050,U03574,ORD011193,2,Managed to order once today after 6 attempts. The food was good at least.,ios,2025-01-28 17:27:17
+review_id,user_id,order_id,rating,text,platform,city,created_at
+REV0004,U02708,ORD004016,4,Nice app. The cart flow is smooth and the offers are useful.,android,delhi_ncr,2024-07-16 12:19:40
+REV0007,U00400,ORD005331,5,Delivery was quick and the biryani arrived piping hot. ZaikaNow has been super reliable lately.,android,bengaluru,2024-07-20 04:34:46
+REV0005,U02684,ORD010687,4,Consistent delivery experience. Will keep ordering from here.,ios,mumbai,2024-08-05 12:39:39
+REV0008,U03718,ORD010970,4,Loved the breakfast combo from Anna Idli House. Easy checkout and fast delivery.,android,mumbai,2024-08-06 11:13:10
+REV0003,U01296,ORD012990,5,Great restaurant selection in Bengaluru. Ordering with UPI usually takes seconds.,android,mumbai,2024-08-13 00:01:26
+REV0011,U06251,ORD016931,4,Consistent delivery experience. Will keep ordering from here.,ios,hyderabad,2024-08-25 12:51:10
+REV0022,U04464,ORD017406,4,Nice app. The cart flow is smooth and the offers are useful.,android,mumbai,2024-08-25 22:50:40
+REV0020,U00623,ORD024896,4,Loved the breakfast combo from Anna Idli House. Easy checkout and fast delivery.,ios,bengaluru,2024-09-18 13:29:35
+REV0023,U00334,ORD027199,4,Consistent delivery experience. Will keep ordering from here.,android,pune,2024-09-25 01:41:35
+REV0016,U05744,ORD027577,4,Nice app. The cart flow is smooth and the offers are useful.,ios,delhi_ncr,2024-09-25 15:48:31
+REV0024,U03888,ORD027718,3,"Search feels a bit cluttered, but the order experience is solid overall.",android,mumbai,2024-09-26 09:53:39
+REV0019,U05297,ORD029553,5,Delivery was quick and the biryani arrived piping hot. ZaikaNow has been super reliable lately.,android,bengaluru,2024-10-01 21:20:07
+REV0017,U05895,ORD041927,4,Consistent delivery experience. Will keep ordering from here.,android,pune,2024-11-04 21:19:28
+REV0018,U05615,ORD044788,3,"Search feels a bit cluttered, but the order experience is solid overall.",web,pune,2024-11-13 19:22:13
+REV0012,U04288,ORD045005,3,"Search feels a bit cluttered, but the order experience is solid overall.",android,mumbai,2024-11-14 10:55:35
+REV0013,U04439,ORD045073,5,Delivery was quick and the biryani arrived piping hot. ZaikaNow has been super reliable lately.,android,mumbai,2024-11-15 04:13:41
+REV0021,U03349,ORD046847,5,Great restaurant selection in Bengaluru. Ordering with UPI usually takes seconds.,web,mumbai,2024-11-19 02:15:46
+REV0006,U00799,ORD048127,3,"Search feels a bit cluttered, but the order experience is solid overall.",web,mumbai,2024-11-22 20:35:19
+REV0009,U04008,ORD049210,5,Great restaurant selection in Bengaluru. Ordering with UPI usually takes seconds.,android,bengaluru,2024-11-26 22:26:24
+REV0010,U03707,ORD054409,4,Nice app. The cart flow is smooth and the offers are useful.,web,mumbai,2024-12-09 13:00:36
+REV0001,U05597,ORD059268,5,Delivery was quick and the biryani arrived piping hot. ZaikaNow has been super reliable lately.,ios,bengaluru,2024-12-21 20:47:24
+REV0015,U00954,ORD060750,5,Great restaurant selection in Bengaluru. Ordering with UPI usually takes seconds.,web,delhi_ncr,2024-12-25 10:19:19
+REV0002,U00175,ORD062727,4,Loved the breakfast combo from Anna Idli House. Easy checkout and fast delivery.,ios,mumbai,2024-12-29 00:37:37
+REV0014,U00927,ORD064968,4,Loved the breakfast combo from Anna Idli House. Easy checkout and fast delivery.,web,delhi_ncr,2025-01-04 15:04:01
+REV0025,U05098,ORD068199,1,UPI got stuck on processing and the order never confirmed. Had to switch apps for dinner.,android,mumbai,2025-01-10 07:21:55
+REV0041,U04777,ORD068707,2,Money was debited from my bank app but ZaikaNow still showed payment failed.,web,delhi_ncr,2025-01-12 07:03:28
+REV0042,U05538,ORD069166,1,Payment confirmation is broken on Android. Tried twice from Bengaluru and both attempts timed out.,android,delhi_ncr,2025-01-12 18:04:33
+REV0028,U03931,ORD068823,4,Food was good but checkout felt slower than usual.,android,bengaluru,2025-01-13 20:27:54
+REV0040,U03625,ORD069921,1,UPI got stuck on processing and the order never confirmed. Had to switch apps for dinner.,web,chennai,2025-01-16 05:31:41
+REV0026,U02353,ORD071759,2,Money was debited from my bank app but ZaikaNow still showed payment failed.,ios,mumbai,2025-01-21 06:32:30
+REV0032,U05795,ORD072471,1,Payment confirmation is broken on Android. Tried twice from Bengaluru and both attempts timed out.,web,bengaluru,2025-01-22 10:05:18
+REV0038,U00320,ORD072220,4,Food was good but checkout felt slower than usual.,ios,hyderabad,2025-01-23 02:59:39
+REV0036,U00499,ORD073758,2,Money was debited from my bank app but ZaikaNow still showed payment failed.,android,mumbai,2025-01-26 00:10:41
+REV0027,U01394,ORD073480,1,Payment confirmation is broken on Android. Tried twice from Bengaluru and both attempts timed out.,android,pune,2025-01-26 01:58:13
+REV0031,U04268,ORD073338,2,Money was debited from my bank app but ZaikaNow still showed payment failed.,android,chennai,2025-01-26 16:29:01
+REV0037,U06335,ORD073859,1,Payment confirmation is broken on Android. Tried twice from Bengaluru and both attempts timed out.,android,delhi_ncr,2025-01-26 18:19:36
+REV0043,U04934,ORD074292,4,Food was good but checkout felt slower than usual.,ios,hyderabad,2025-01-27 15:42:28
+REV0029,U03820,ORD074175,2,The app asked me to retry UPI three times. Very frustrating.,android,delhi_ncr,2025-01-28 02:33:52
+REV0044,U05973,ORD074255,2,The app asked me to retry UPI three times. Very frustrating.,android,bengaluru,2025-01-28 04:23:42
+REV0035,U05267,ORD074832,1,UPI got stuck on processing and the order never confirmed. Had to switch apps for dinner.,ios,pune,2025-01-28 05:44:16
+REV0034,U06361,ORD074986,2,The app asked me to retry UPI three times. Very frustrating.,web,mumbai,2025-01-28 22:50:19
+REV0039,U06267,ORD075352,2,The app asked me to retry UPI three times. Very frustrating.,android,delhi_ncr,2025-01-30 01:17:42
+REV0030,U04189,ORD075620,1,UPI got stuck on processing and the order never confirmed. Had to switch apps for dinner.,android,delhi_ncr,2025-01-31 07:13:22
+REV0033,U04141,ORD076290,4,Food was good but checkout felt slower than usual.,android,delhi_ncr,2025-02-01 00:17:15
+REV0056,U00310,ORD076731,4,"Card payment worked fine today, but UPI is still flaky for me.",ios,chennai,2025-02-02 15:27:59
+REV0046,U02567,ORD077223,1,Still seeing callback timeout after paying through UPI. Support says wait 24 hours.,android,mumbai,2025-02-04 07:39:16
+REV0060,U03459,ORD077376,4,"Card payment worked fine today, but UPI is still flaky for me.",ios,mumbai,2025-02-05 04:43:50
+REV0045,U02949,ORD077317,2,"UPI works sometimes now, but I still don’t trust whether the order will confirm.",android,pune,2025-02-05 08:46:16
+REV0052,U01230,ORD077582,4,"Card payment worked fine today, but UPI is still flaky for me.",android,bengaluru,2025-02-06 02:09:41
+REV0049,U05446,ORD077727,2,"UPI works sometimes now, but I still don’t trust whether the order will confirm.",android,bengaluru,2025-02-06 08:56:26
+REV0059,U03752,ORD078301,3,"Managed to order after a retry. Better than last week, but not fixed.",web,delhi_ncr,2025-02-07 16:22:45
+REV0053,U03236,ORD078563,2,"UPI works sometimes now, but I still don’t trust whether the order will confirm.",android,mumbai,2025-02-08 03:15:16
+REV0048,U01551,ORD078440,4,"Card payment worked fine today, but UPI is still flaky for me.",android,chennai,2025-02-08 04:34:40
+REV0054,U02230,ORD078472,1,Still seeing callback timeout after paying through UPI. Support says wait 24 hours.,android,delhi_ncr,2025-02-08 08:46:49
+REV0057,U05703,ORD078802,2,"UPI works sometimes now, but I still don’t trust whether the order will confirm.",web,bengaluru,2025-02-09 17:14:53
+REV0058,U01992,ORD079327,1,Still seeing callback timeout after paying through UPI. Support says wait 24 hours.,ios,hyderabad,2025-02-10 09:26:49
+REV0050,U00780,ORD079579,1,Still seeing callback timeout after paying through UPI. Support says wait 24 hours.,android,delhi_ncr,2025-02-10 22:29:47
+REV0047,U04524,ORD079564,3,"Managed to order after a retry. Better than last week, but not fixed.",web,mumbai,2025-02-11 22:18:05
+REV0055,U05589,ORD079775,3,"Managed to order after a retry. Better than last week, but not fixed.",android,hyderabad,2025-02-13 03:00:11
+REV0051,U04745,ORD080877,3,"Managed to order after a retry. Better than last week, but not fixed.",ios,mumbai,2025-02-15 07:28:12
+REV0075,U05767,ORD083110,3,"App is faster now, but the earlier failed payments really damaged confidence.",android,delhi_ncr,2025-02-23 06:17:48
+REV0069,U02765,ORD083850,2,"Technical issue seems better, but I’ve started ordering less because I don’t trust the payment flow.",android,pune,2025-02-24 22:56:39
+REV0070,U05550,ORD085477,1,Shifted most of my weekend orders to Swiggy after repeated UPI failures here.,android,bengaluru,2025-02-28 21:22:47
+REV0062,U03856,ORD086223,1,Shifted most of my weekend orders to Swiggy after repeated UPI failures here.,ios,pune,2025-03-03 21:19:57
+REV0076,U02479,ORD087982,4,"Food quality is good, but ZaikaNow needs to win back trust after the January issues.",android,delhi_ncr,2025-03-07 22:07:35
+REV0068,U04176,ORD089676,4,"Food quality is good, but ZaikaNow needs to win back trust after the January issues.",android,bengaluru,2025-03-13 14:52:29
+REV0074,U04313,ORD089667,1,Shifted most of my weekend orders to Swiggy after repeated UPI failures here.,web,mumbai,2025-03-14 05:59:26
+REV0065,U00783,ORD089994,2,"Technical issue seems better, but I’ve started ordering less because I don’t trust the payment flow.",android,pune,2025-03-14 08:28:41
+REV0073,U01472,ORD089804,2,"Technical issue seems better, but I’ve started ordering less because I don’t trust the payment flow.",android,mumbai,2025-03-15 17:07:39
+REV0063,U04553,ORD092827,3,"App is faster now, but the earlier failed payments really damaged confidence.",web,mumbai,2025-03-22 14:31:13
+REV0071,U06029,ORD093828,3,"App is faster now, but the earlier failed payments really damaged confidence.",android,bengaluru,2025-03-26 02:15:25
+REV0066,U00397,ORD094354,1,Shifted most of my weekend orders to Swiggy after repeated UPI failures here.,android,chennai,2025-03-27 05:57:19
+REV0061,U05124,ORD094918,2,"Technical issue seems better, but I’ve started ordering less because I don’t trust the payment flow.",android,chennai,2025-03-29 21:42:27
+REV0072,U04577,ORD095439,4,"Food quality is good, but ZaikaNow needs to win back trust after the January issues.",ios,delhi_ncr,2025-03-31 01:07:50
+REV0064,U05925,ORD095844,4,"Food quality is good, but ZaikaNow needs to win back trust after the January issues.",web,pune,2025-04-01 02:59:56
+REV0067,U06422,ORD095893,3,"App is faster now, but the earlier failed payments really damaged confidence.",android,hyderabad,2025-04-02 05:26:42

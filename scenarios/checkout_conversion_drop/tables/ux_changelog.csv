@@ -1,12 +1,10 @@
 date,change_type,description,affected_area,platform
-2024-12-18,feature,Added restaurant category filters,search,all
-2024-12-22,feature,Holiday promo banner,homepage,all
-2024-12-28,bugfix,Fixed menu item image loading on slow connections,restaurant_page,all
-2025-01-03,ab_test,Testing new cart summary layout (50% of users),cart,all
-2025-01-08,feature,Updated restaurant search ranking algorithm,search,all
-2025-01-10,feature,New payment confirmation animation,checkout,all
-2025-01-12,bugfix,Fixed checkout button alignment on small screens,checkout,ios
-2025-01-15,feature,Added order tracking real-time updates,order_tracking,all
-2025-01-18,bugfix,Fixed push notification permission prompt,notifications,ios
-2025-01-20,ab_test,Testing simplified checkout flow (30% of users),checkout,all
-2025-01-25,bugfix,Fixed restaurant rating display rounding,restaurant_page,all
+2024-12-18,feature,Added cuisine shortcuts for breakfast and biryani,homepage,all
+2024-12-27,feature,New Year offer rail on the home feed,homepage,all
+2025-01-05,ab_test,Testing a denser cart summary layout,cart,all
+2025-01-08,feature,Updated restaurant ranking for repeat orders,search,all
+2025-01-10,feature,New payment success animation after confirmation,checkout,all
+2025-01-12,bugfix,Fixed checkout button alignment on smaller Android screens,checkout,android
+2025-01-20,ab_test,Testing simplified checkout review sheet,checkout,all
+2025-01-25,feature,Republic Day specials collection,homepage,all
+2025-02-08,bugfix,Improved failed-payment copy on the review screen,checkout,all

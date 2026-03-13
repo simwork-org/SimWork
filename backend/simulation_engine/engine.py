@@ -11,18 +11,32 @@ from investigation_logger.logger import (
     create_session,
     get_queries_count,
     get_query_history,
+    get_saved_evidence,
+    get_scoring_result,
     get_session,
+    get_session_events,
     log_query,
-    save_hypothesis,
+    log_session_event,
+    remove_evidence,
+    save_evidence,
     submit_solution,
+    update_evidence_annotation,
 )
 from llm_interface.llm_client import LLMClient
-from scenario_loader.loader import load_scenario
+from scenario_loader.loader import get_agent_capability_profiles, load_reference, load_scenario
+from scoring.scorer import score_session
 
-# Default time limit in minutes
 DEFAULT_TIME_LIMIT = 30
 
-# Lazy LLM client
+UI_EVENT_TYPES = {
+    "agent_selected",
+    "suggestion_clicked",
+    "reference_opened",
+    "reference_tab_changed",
+    "submission_started",
+    "submission_evidence_selected",
+}
+
 _llm: LLMClient | None = None
 
 
@@ -34,12 +48,9 @@ def _get_llm() -> LLMClient:
 
 
 def start_session(candidate_id: str, scenario_id: str) -> dict[str, Any]:
-    """Create a new simulation session."""
     scenario = load_scenario(scenario_id)
     session_id = f"session_{uuid.uuid4().hex[:12]}"
-
     create_session(session_id, candidate_id, scenario_id)
-
     return {
         "session_id": session_id,
         "scenario_id": scenario_id,
@@ -50,20 +61,21 @@ def start_session(candidate_id: str, scenario_id: str) -> dict[str, Any]:
 
 
 def get_scenario_details(session_id: str) -> dict[str, Any]:
-    """Return scenario details for a session."""
     session = get_session(session_id)
     if session is None:
         raise ValueError(f"Session not found: {session_id}")
     scenario = load_scenario(session["scenario_id"])
+    reference = load_reference(session["scenario_id"])
     return {
         "scenario_id": scenario["scenario_id"],
         "title": scenario["title"],
         "problem_statement": scenario["problem_statement"],
+        "reference_panel": reference,
+        "agent_profiles": get_agent_capability_profiles(session["scenario_id"]),
     }
 
 
-def handle_query(session_id: str, agent: str, query: str) -> dict[str, Any]:
-    """Process a candidate query to an agent."""
+def handle_query(session_id: str, agent: str, query: str, input_mode: str = "typed") -> dict[str, Any]:
     session = get_session(session_id)
     if session is None:
         raise ValueError(f"Session not found: {session_id}")
@@ -71,48 +83,125 @@ def handle_query(session_id: str, agent: str, query: str) -> dict[str, Any]:
         raise ValueError("Session is no longer active")
 
     validate_agent(agent)
-
-    # Get conversation history for context
     history = get_query_history(session_id)
-    conversation_history = []
-    for h in history[-6:]:  # last 6 exchanges for context
-        conversation_history.append({"role": "user", "content": h["query"]})
-        conversation_history.append({"role": "assistant", "content": h["response"]})
-
     result = route_query(
         llm=_get_llm(),
         scenario_id=session["scenario_id"],
         agent=agent,
         query=query,
-        conversation_history=conversation_history if conversation_history else None,
+        conversation_history=history[-10:] if history else None,
     )
+    planner = result.pop("_planner", None)
+    query_log_id = log_query(
+        session_id,
+        agent,
+        query,
+        result["response"],
+        artifacts=result.get("artifacts"),
+        citations=result.get("citations"),
+        warnings=result.get("warnings"),
+        planner=planner,
+    )
+    log_session_event(
+        session_id,
+        "query_submitted",
+        {
+            "agent": agent,
+            "query_text": query,
+            "input_mode": input_mode,
+            "query_log_id": query_log_id,
+        },
+    )
+    return {
+        **result,
+        "query_log_id": query_log_id,
+    }
 
-    log_query(session_id, agent, query, result["response"])
-    return result
 
-
-def handle_hypothesis(session_id: str, hypothesis: str) -> dict[str, Any]:
-    """Save or update a hypothesis."""
+def handle_log_event(session_id: str, event_type: str, event_payload: dict[str, Any] | None = None) -> dict[str, Any]:
     session = get_session(session_id)
     if session is None:
         raise ValueError(f"Session not found: {session_id}")
-    version = save_hypothesis(session_id, hypothesis)
-    return {"status": "saved", "hypothesis_version": version}
+    if event_type not in UI_EVENT_TYPES:
+        raise ValueError(f"Unsupported event type: {event_type}")
+    event_id = log_session_event(session_id, event_type, event_payload or {})
+    return {"status": "logged", "event_id": event_id}
+
+
+def handle_get_saved_evidence(session_id: str) -> dict[str, Any]:
+    session = get_session(session_id)
+    if session is None:
+        raise ValueError(f"Session not found: {session_id}")
+    return {"evidence": get_saved_evidence(session_id)}
+
+
+def handle_save_evidence(
+    session_id: str,
+    query_log_id: int,
+    citation_id: str,
+    agent: str,
+    annotation: str | None = None,
+) -> dict[str, Any]:
+    session = get_session(session_id)
+    if session is None:
+        raise ValueError(f"Session not found: {session_id}")
+    saved_id = save_evidence(session_id, query_log_id, citation_id, agent, annotation)
+    evidence = get_saved_evidence(session_id)
+    saved_item = next((item for item in evidence if item["id"] == saved_id), None)
+    return {"status": "saved", "saved_evidence_id": saved_id, "evidence_count": len(evidence), "saved_evidence": saved_item}
+
+
+def handle_remove_evidence(session_id: str, saved_evidence_id: int) -> dict[str, Any]:
+    session = get_session(session_id)
+    if session is None:
+        raise ValueError(f"Session not found: {session_id}")
+    removed = remove_evidence(session_id, saved_evidence_id)
+    if not removed:
+        raise ValueError(f"Saved evidence not found: {saved_evidence_id}")
+    return {"status": "removed", "evidence_count": len(get_saved_evidence(session_id))}
+
+
+def handle_update_evidence_annotation(session_id: str, saved_evidence_id: int, annotation: str | None) -> dict[str, Any]:
+    session = get_session(session_id)
+    if session is None:
+        raise ValueError(f"Session not found: {session_id}")
+    updated = update_evidence_annotation(session_id, saved_evidence_id, annotation)
+    if not updated:
+        raise ValueError(f"Saved evidence not found: {saved_evidence_id}")
+    saved_item = next((item for item in get_saved_evidence(session_id) if item["id"] == saved_evidence_id), None)
+    return {"status": "updated", "saved_evidence": saved_item}
 
 
 def handle_submission(
-    session_id: str, root_cause: str, proposed_actions: list[str], summary: str
+    session_id: str,
+    root_cause: str,
+    supporting_evidence_ids: list[int],
+    proposed_actions: list[dict[str, Any]],
+    stakeholder_summary: str,
 ) -> dict[str, Any]:
-    """Submit final solution."""
     session = get_session(session_id)
     if session is None:
         raise ValueError(f"Session not found: {session_id}")
-    submit_solution(session_id, root_cause, proposed_actions, summary)
-    return {"status": "submitted", "session_complete": True}
+    submission_id = submit_solution(
+        session_id,
+        root_cause,
+        supporting_evidence_ids,
+        proposed_actions,
+        stakeholder_summary,
+    )
+    log_session_event(
+        session_id,
+        "submission_completed",
+        {
+            "submission_id": submission_id,
+            "supporting_evidence_ids": supporting_evidence_ids,
+            "action_count": len(proposed_actions),
+        },
+    )
+    return {"status": "submitted", "session_complete": True, "submission_id": submission_id}
 
 
 def get_session_status(session_id: str) -> dict[str, Any]:
-    """Return current session status."""
     session = get_session(session_id)
     if session is None:
         raise ValueError(f"Session not found: {session_id}")
@@ -125,6 +214,30 @@ def get_session_status(session_id: str) -> dict[str, Any]:
         "session_id": session_id,
         "scenario_id": session["scenario_id"],
         "time_remaining_minutes": round(time_remaining, 1),
-        "current_hypothesis": session["current_hypothesis"],
         "queries_made": get_queries_count(session_id),
+        "saved_evidence_count": len(get_saved_evidence(session_id)),
     }
+
+
+def get_session_process_log(session_id: str) -> dict[str, Any]:
+    session = get_session(session_id)
+    if session is None:
+        raise ValueError(f"Session not found: {session_id}")
+    return {"events": get_session_events(session_id)}
+
+
+def handle_score_session(session_id: str) -> dict[str, Any]:
+    session = get_session(session_id)
+    if session is None:
+        raise ValueError(f"Session not found: {session_id}")
+    return score_session(session_id)
+
+
+def handle_get_score(session_id: str) -> dict[str, Any]:
+    session = get_session(session_id)
+    if session is None:
+        raise ValueError(f"Session not found: {session_id}")
+    result = get_scoring_result(session_id)
+    if result is None:
+        raise ValueError(f"No scoring result for session: {session_id}")
+    return result

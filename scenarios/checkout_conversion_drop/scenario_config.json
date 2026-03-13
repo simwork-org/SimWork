@@ -3,119 +3,228 @@
   "title": "Checkout Conversion Drop",
   "difficulty": "medium",
   "industry": "food_delivery",
-  "product": "FoodDash",
-  "problem_statement": "Weekly orders have dropped by 18% over the past month. Competitors are maintaining steady volume. Your leadership team needs a data-backed explanation and recovery plan.",
+  "product": "ZaikaNow",
+  "problem_statement": "Late-January completed orders have softened across key Indian metros while major competitors continue to hold steady. Leadership needs a data-backed explanation and a recovery plan.",
   "time_limit_minutes": 30,
   "available_agents": ["analyst", "ux_researcher", "engineering_lead"],
-  "root_cause": "payment_service_latency_after_paystream_v3_migration",
-  "root_cause_detail": "PayStream v3 payment gateway migration on Jan 10 introduced a latency regression in the iOS payment path, causing timeouts and failures that disproportionately affect iOS and Apple Pay users.",
-
+  "root_cause": "payment_service_upi_callback_regression_after_rupeeflow_v3_migration",
+  "root_cause_detail": "The RupeeFlow v3 migration on January 10, 2025 degraded UPI confirmation and callback handling. Android users in high-volume metros were hit hardest, leading to payment failures, delayed confirmations, and eventual trust damage in repeat-order cohorts.",
+  "challenge_catalog": {
+    "easy": {
+      "title": "What Broke First?",
+      "prompt": "Identify the broken checkout step and the most affected platform-city segment.",
+      "success_criteria": "Candidate isolates the payment step, names UPI as the failing method, and identifies the top impacted metro/platform cohort."
+    },
+    "medium": {
+      "title": "What Caused the Business Drop?",
+      "prompt": "Connect the late-January order slowdown to the underlying payment reliability issue using analytics, UX, and engineering evidence.",
+      "success_criteria": "Candidate ties order softness to the RupeeFlow v3 migration and rejects weaker red herrings."
+    },
+    "hard": {
+      "title": "Why Didn’t Recovery Fully Happen?",
+      "prompt": "Explain why business metrics stayed weak even after partial mitigation and propose a recovery plan.",
+      "success_criteria": "Candidate separates the initial incident from trust and retention damage in high-value cohorts."
+    }
+  },
   "data_model": {
     "tables_directory": "tables/",
+    "agent_capability_profiles": {
+      "analyst": {
+        "role_name": "Data Analyst",
+        "supported_intents": [
+          "reference",
+          "dataset_summary",
+          "schema_question",
+          "investigation",
+          "comparison",
+          "trend_analysis",
+          "root_cause_analysis"
+        ],
+        "supported_operations": [
+          "lookup_rows",
+          "rank_rows",
+          "aggregate_breakdown",
+          "aggregate_timeseries",
+          "compute_funnel",
+          "summarize_source_profile",
+          "summarize_date_span",
+          "compare_segments",
+          "summarize_metric_delta"
+        ],
+        "preferred_artifact_kinds": ["metric", "chart", "table"],
+        "board_eligibility_rules": {
+          "default_intents": ["investigation", "comparison", "trend_analysis", "root_cause_analysis"],
+          "inline_only_intents": ["reference", "dataset_summary", "schema_question"]
+        },
+        "follow_up_styles": [
+          "trend drill-downs",
+          "segment comparisons",
+          "date-range clarifications"
+        ]
+      },
+      "ux_researcher": {
+        "role_name": "UX Researcher",
+        "supported_intents": [
+          "reference",
+          "dataset_summary",
+          "schema_question",
+          "investigation",
+          "comparison",
+          "quote_lookup",
+          "root_cause_analysis"
+        ],
+        "supported_operations": [
+          "read_document_excerpt",
+          "lookup_rows",
+          "aggregate_breakdown",
+          "summarize_source_profile",
+          "extract_feedback_themes",
+          "select_representative_quotes",
+          "count_issue_mentions",
+          "summarize_ux_change_impact"
+        ],
+        "preferred_artifact_kinds": ["table"],
+        "board_eligibility_rules": {
+          "default_intents": ["investigation", "comparison", "quote_lookup", "root_cause_analysis"],
+          "inline_only_intents": ["reference", "dataset_summary", "schema_question"]
+        },
+        "follow_up_styles": [
+          "theme drill-downs",
+          "quote requests",
+          "UX change correlation"
+        ]
+      },
+      "engineering_lead": {
+        "role_name": "Engineering Lead",
+        "supported_intents": [
+          "reference",
+          "dataset_summary",
+          "schema_question",
+          "investigation",
+          "comparison",
+          "incident_timeline",
+          "root_cause_analysis",
+          "trend_analysis"
+        ],
+        "supported_operations": [
+          "lookup_rows",
+          "aggregate_breakdown",
+          "aggregate_timeseries",
+          "summarize_source_profile",
+          "build_incident_timeline",
+          "correlate_deployments_with_metrics",
+          "summarize_error_shift",
+          "compare_pre_post_rollout"
+        ],
+        "preferred_artifact_kinds": ["chart", "table", "metric"],
+        "board_eligibility_rules": {
+          "default_intents": ["investigation", "comparison", "incident_timeline", "root_cause_analysis", "trend_analysis"],
+          "inline_only_intents": ["reference", "dataset_summary", "schema_question"]
+        },
+        "follow_up_styles": [
+          "timeline review",
+          "metric correlation",
+          "error-code breakdowns"
+        ]
+      }
+    },
     "agent_data_access": {
       "analyst": {
         "tables": ["orders.csv", "payments.csv", "sessions_events.csv", "users.csv"],
         "access_type": "aggregated_views",
-        "description": "Business metrics, funnels, and segment analysis"
+        "description": "Business metrics, funnels, payment method analysis, city and cohort segmentation"
       },
       "ux_researcher": {
         "tables": ["reviews.csv", "support_tickets.csv", "usability_study.md", "ux_changelog.csv"],
         "access_type": "direct",
-        "description": "User feedback, support tickets, usability research, UX change history"
+        "description": "User feedback, support tickets, usability research, and product change history"
       },
       "engineering_lead": {
         "tables": ["deployments.csv", "service_metrics.csv", "system_architecture.md", "payment_errors_summary.csv"],
         "access_type": "direct",
-        "description": "Deployment history, service health metrics, system architecture, error patterns"
+        "description": "Deployment history, service health metrics, architecture notes, and payment error patterns"
       }
     }
   },
-
   "expected_investigation_path": [
     "orders_trend_analysis",
     "checkout_funnel_breakdown",
-    "platform_segment_analysis",
+    "city_platform_segment_analysis",
+    "payment_method_review",
     "deployment_timeline_review",
     "payment_service_latency_check",
-    "error_pattern_investigation",
-    "user_feedback_validation"
+    "user_feedback_validation",
+    "retention_damage_assessment"
   ],
-
   "expected_key_findings": [
-    "Orders declining since Jan 10 while DAU remains stable — users visit but can't complete orders",
-    "Payment step has highest funnel drop-off (93% → ~55% post Jan 10)",
-    "iOS hit 6x worse than Android (-30% vs -5% order change)",
-    "Apple Pay worst affected payment method (~45% success rate)",
-    "PayStream v3 migration deployed Jan 10 correlates exactly with decline start",
-    "Payment service p99 latency spiked from 450ms to 4,500ms (10x)",
-    "Error codes shifted to GATEWAY_TIMEOUT and PAYMENT_PROVIDER_ERROR",
-    "Jan 14 hotfix (timeout increase) briefly helped then regressed",
-    "iOS users explicitly reporting payment hangs and switching to competitors",
-    "Usability study shows task completion dropped from 92% to 54%"
+    "Completed orders weaken after January 10 while upper-funnel traffic remains relatively more stable",
+    "The largest funnel break occurs from payment attempt to order completion",
+    "Android users in Bengaluru, Mumbai, and Delhi NCR show the sharpest degradation",
+    "UPI is the most affected payment method and the main driver of failed confirmations",
+    "RupeeFlow v3 migration on January 10 aligns closely with the reliability decline",
+    "Payment service p99 latency spikes sharply after the migration while other core services remain mostly stable",
+    "Payment error mix shifts toward UPI_CALLBACK_TIMEOUT, BANK_TIMEOUT, and PAYMENT_PROVIDER_ERROR",
+    "Early-February mitigations improve technical metrics but do not fully restore order frequency",
+    "Support tickets and reviews show trust damage: users mention money debited, unclear confirmation, and switching apps",
+    "Repeat-order behavior remains soft in impacted cohorts even after partial mitigation"
   ],
-
   "red_herrings": [
     {
-      "signal": "Holiday promo Dec 26-31 caused DAU spike",
-      "why_misleading": "Candidate might think 'traffic dropped after promo ended' but the real decline starts Jan 10, not Jan 1"
+      "signal": "New Year campaign caused a visible demand spike from late December into early January",
+      "why_misleading": "Traffic normalization after the campaign is real, but it does not explain the payment-step degradation that starts on January 10."
     },
     {
-      "signal": "search_service p99 spike on Jan 8",
-      "why_misleading": "Resolved by Jan 9, doesn't correlate with Jan 10+ decline — it was an index rebuild"
+      "signal": "Search service p99 latency spikes on January 8",
+      "why_misleading": "The spike is brief, resolves quickly, and does not line up with the checkout failure pattern."
     },
     {
-      "signal": "notification_service errors Jan 20-22",
-      "why_misleading": "Unrelated email provider issue, tests if candidate stays focused on payment thread"
+      "signal": "Republic Day promo and homepage rail changes launch in late January",
+      "why_misleading": "They can distract candidates toward merchandizing explanations, but the sharper reliability break is already visible in payments."
     },
     {
-      "signal": "EU region -15% decline",
-      "why_misleading": "Partly holiday calendar differences, not solely payment issues — tests multi-factor thinking"
+      "signal": "Notification service errors rise briefly on January 20-22",
+      "why_misleading": "This creates noise in communication flows, not in payment authorization or confirmation."
     },
     {
-      "signal": "UX changelog shows 'payment confirmation animation' change on Jan 10",
-      "why_misleading": "A UI animation change, not the backend payment migration — tests if candidate distinguishes UI from infra"
-    },
-    {
-      "signal": "Promo code WINTER25 bug in support tickets",
-      "why_misleading": "Normal operational issue unrelated to the order decline"
+      "signal": "Checkout success animation ships on January 10",
+      "why_misleading": "It is adjacent in time but not strong enough to explain the scale and persistence of the payment degradation."
     }
   ],
-
   "evaluation_rubric": {
     "root_cause_identification": {
       "weight": 0.35,
       "levels": {
-        "excellent": "Identifies PayStream v3 migration as root cause, explains iOS-specific latency regression, links deployment date to metric decline",
-        "good": "Identifies payment service issue and iOS correlation but may not pinpoint the exact deployment",
-        "adequate": "Identifies payment step as problematic but doesn't isolate the technical trigger",
-        "poor": "Blames wrong factor (promo ending, UI changes, general traffic decline)"
+        "excellent": "Identifies the RupeeFlow v3 migration as the root cause, explains the UPI confirmation regression, and links it to Android-heavy metro impact and business decline",
+        "good": "Identifies the payment gateway issue and the UPI / city pattern, but may not frame the full causal chain",
+        "adequate": "Identifies the payment step as the main problem but does not isolate the migration or affected segment cleanly",
+        "poor": "Blames weaker factors such as promos, search ranking, or general traffic decline"
       }
     },
     "investigation_methodology": {
       "weight": 0.25,
       "levels": {
-        "excellent": "Systematically queries all 3 agents, cross-references findings, avoids red herrings, forms and refines hypotheses",
-        "good": "Queries multiple agents, makes connections between data sources",
-        "adequate": "Uses agents but doesn't effectively cross-reference or gets distracted by red herrings",
-        "poor": "Only queries one agent, doesn't explore multiple data dimensions"
+        "excellent": "Systematically queries all three agents, cross-references conflicting clues, rejects red herrings, and explains both the incident and downstream business effects",
+        "good": "Uses multiple agents and connects the main technical and UX evidence",
+        "adequate": "Explores some evidence but misses important cross-functional links or timeline logic",
+        "poor": "Relies on a single domain or reaches a conclusion without strong evidence"
       }
     },
     "solution_quality": {
       "weight": 0.25,
       "levels": {
-        "excellent": "Tiered action plan (immediate rollback + short-term fixes + long-term prevention), user recovery plan, monitoring improvements, data-backed impact quantification",
-        "good": "Structured actions including rollback and follow-up improvements",
-        "adequate": "Proposes rollback but lacks depth on prevention or recovery",
-        "poor": "Vague solution without concrete actions"
+        "excellent": "Proposes immediate stabilization, payment-status UX fixes, customer trust recovery, and monitoring for repeat-order recovery",
+        "good": "Proposes strong technical remediation plus some customer recovery actions",
+        "adequate": "Suggests fixes for payment reliability but lacks user-trust or monitoring depth",
+        "poor": "Offers generic actions without prioritization or evidence linkage"
       }
     },
     "communication": {
       "weight": 0.15,
       "levels": {
-        "excellent": "Frames for leadership (revenue impact, competitive risk, timeline), clear stakeholder narrative",
-        "good": "Clear summary with supporting data points",
-        "adequate": "Identifies issue but explanation is disorganized",
-        "poor": "Unclear communication, dumps raw data without synthesis"
+        "excellent": "Frames the problem for leadership with business impact, affected metros, customer trust risk, and a clear recovery narrative",
+        "good": "Provides a clear summary with supporting evidence",
+        "adequate": "Explains the issue but with limited prioritization or synthesis",
+        "poor": "Communicates in a fragmented way or dumps disconnected observations"
       }
     }
   }

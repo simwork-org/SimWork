@@ -1,0 +1,159 @@
+{
+  "mission_brief": {
+    "title": "Checkout Conversion Drop",
+    "problem": "Late-January completed orders have softened across key Indian metros while major competitors continue to hold steady.",
+    "objective": "Investigate ZaikaNow's checkout slowdown by querying analytics, UX research, and engineering teammates. Build an evidence-backed root-cause analysis and recommend a recovery plan.",
+    "notes": [
+      "Each teammate sees only their own operational domain.",
+      "Strong answers cross-reference evidence instead of relying on a single agent.",
+      "The longer history includes baseline, disruption, partial recovery, and downstream trust effects."
+    ]
+  },
+  "source_catalog": [
+    {
+      "domain": "Analytics",
+      "agent": "analyst",
+      "sources": [
+        {
+          "name": "orders.csv",
+          "description": "Order attempts with status, INR amount, platform, city, and created_at timestamp.",
+          "fields": [
+            { "name": "order_id", "type": "string", "description": "Unique order identifier." },
+            { "name": "user_id", "type": "string", "description": "User who placed the order." },
+            { "name": "order_status", "type": "enum", "description": "completed / failed / cancelled." },
+            { "name": "total_amount", "type": "float", "description": "Order total in INR." },
+            { "name": "platform", "type": "enum", "description": "ios / android / web." },
+            { "name": "city", "type": "enum", "description": "bengaluru / mumbai / delhi_ncr / hyderabad / pune / chennai." },
+            { "name": "created_at", "type": "datetime", "description": "Order timestamp." }
+          ]
+        },
+        {
+          "name": "payments.csv",
+          "description": "Payment attempts with method, provider, status, city, platform, and processing time.",
+          "fields": [
+            { "name": "payment_id", "type": "string", "description": "Unique payment identifier." },
+            { "name": "order_id", "type": "string", "description": "Linked order identifier." },
+            { "name": "method", "type": "enum", "description": "upi / credit_card / debit_card / wallet / cod." },
+            { "name": "provider", "type": "enum", "description": "rupeeflow_v2 / rupeeflow_v3 / cash_on_delivery." },
+            { "name": "status", "type": "enum", "description": "success / failed / timeout." },
+            { "name": "processing_time_ms", "type": "int", "description": "Payment processing duration in milliseconds." },
+            { "name": "error_code", "type": "string", "description": "Observed error code when a payment attempt does not complete cleanly." },
+            { "name": "platform", "type": "enum", "description": "ios / android / web." },
+            { "name": "city", "type": "enum", "description": "City associated with the order." },
+            { "name": "created_at", "type": "datetime", "description": "Payment timestamp." }
+          ]
+        },
+        {
+          "name": "sessions_events.csv",
+          "description": "Session-level product events used to reconstruct browse-to-order funnel behavior.",
+          "fields": [
+            { "name": "session_id", "type": "string", "description": "Unique session identifier." },
+            { "name": "event_type", "type": "enum", "description": "app_open -> restaurant_view -> add_to_cart -> checkout_start -> payment_attempt -> order_complete." },
+            { "name": "platform", "type": "enum", "description": "ios / android / web." },
+            { "name": "city", "type": "enum", "description": "Metro city observed during the session." },
+            { "name": "app_version", "type": "string", "description": "App version observed during the event." },
+            { "name": "timestamp", "type": "datetime", "description": "Event timestamp." }
+          ]
+        },
+        {
+          "name": "users.csv",
+          "description": "Customer profile data including signup date, platform, city, and user type.",
+          "fields": [
+            { "name": "user_id", "type": "string", "description": "Unique user identifier." },
+            { "name": "name", "type": "string", "description": "Customer name." },
+            { "name": "signup_date", "type": "date", "description": "Date the customer first signed up." },
+            { "name": "platform", "type": "enum", "description": "Customer's primary platform." },
+            { "name": "city", "type": "enum", "description": "Home metro city." },
+            { "name": "user_type", "type": "enum", "description": "new / casual / returning / power." }
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "User Signals",
+      "agent": "ux_researcher",
+      "sources": [
+        {
+          "name": "reviews.csv",
+          "description": "Customer reviews with ratings, platform, city, and free-text feedback.",
+          "fields": [
+            { "name": "rating", "type": "int", "description": "1-5 star score." },
+            { "name": "text", "type": "string", "description": "Review body." },
+            { "name": "platform", "type": "enum", "description": "ios / android / web." },
+            { "name": "city", "type": "enum", "description": "City of the reviewed order." }
+          ]
+        },
+        {
+          "name": "support_tickets.csv",
+          "description": "Support tickets with issue category, city, priority, and operational status.",
+          "fields": [
+            { "name": "category", "type": "string", "description": "Ticket category such as payment, checkout, delivery, or promo." },
+            { "name": "subcategory", "type": "string", "description": "Specific issue subtype." },
+            { "name": "platform", "type": "enum", "description": "ios / android / web." },
+            { "name": "city", "type": "enum", "description": "City associated with the complaint." },
+            { "name": "priority", "type": "enum", "description": "low / medium / high / critical." },
+            { "name": "status", "type": "enum", "description": "open / in_progress / resolved." }
+          ]
+        },
+        {
+          "name": "usability_study.md",
+          "description": "Moderated usability research notes focused on checkout and UPI reliability.",
+          "fields": []
+        },
+        {
+          "name": "ux_changelog.csv",
+          "description": "Recent UX changes, experiments, and bugfixes across checkout and discovery flows.",
+          "fields": [
+            { "name": "change_type", "type": "enum", "description": "feature / bugfix / ab_test." },
+            { "name": "affected_area", "type": "string", "description": "Product area touched by the change." }
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "Engineering",
+      "agent": "engineering_lead",
+      "sources": [
+        {
+          "name": "deployments.csv",
+          "description": "Deployment history with service, description, and rollback availability.",
+          "fields": [
+            { "name": "service", "type": "string", "description": "Service that was deployed." },
+            { "name": "description", "type": "string", "description": "Deployment summary." },
+            { "name": "rollback_available", "type": "bool", "description": "Whether rollback is available." }
+          ]
+        },
+        {
+          "name": "service_metrics.csv",
+          "description": "Service latency and error-rate metrics by service and date.",
+          "fields": [
+            { "name": "service", "type": "string", "description": "Service name." },
+            { "name": "p50_ms", "type": "float", "description": "Median latency." },
+            { "name": "p95_ms", "type": "float", "description": "95th percentile latency." },
+            { "name": "p99_ms", "type": "float", "description": "99th percentile latency." },
+            { "name": "error_rate_pct", "type": "float", "description": "Error rate percentage." }
+          ]
+        },
+        {
+          "name": "payment_errors_summary.csv",
+          "description": "Aggregated payment error patterns by code, platform, and date.",
+          "fields": [
+            { "name": "error_code", "type": "string", "description": "Observed payment error code." },
+            { "name": "count", "type": "int", "description": "Number of occurrences." },
+            { "name": "platform", "type": "enum", "description": "ios / android / web." }
+          ]
+        },
+        {
+          "name": "system_architecture.md",
+          "description": "System topology, payment path, and operational architecture notes.",
+          "fields": []
+        }
+      ]
+    }
+  ],
+  "glossary": [
+    { "term": "Checkout conversion", "definition": "Share of sessions that ultimately complete an order." },
+    { "term": "UPI callback timeout", "definition": "A delayed or missing payment confirmation after the customer approves the transaction in the banking app." },
+    { "term": "Power user", "definition": "High-frequency customer segment with repeat ordering behavior." }
+  ]
+}

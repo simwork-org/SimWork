@@ -1,15 +1,10 @@
 deploy_id,service,description,author,timestamp,rollback_available,commit_hash
-DEP001,catalog_service,Added restaurant category filters,sarah.chen,2024-12-18 10:30:00,yes,0f8c275
-DEP002,notification_service,Holiday promo notification batch job,mike.johnson,2024-12-22 14:15:00,yes,76107a8
-DEP003,catalog_service,Image CDN optimization,sarah.chen,2024-12-28 09:45:00,yes,d31dc5a
-DEP004,user_service,Updated user profile caching layer,alex.kumar,2025-01-03 11:00:00,yes,b024f61
-DEP005,search_service,New restaurant ranking algorithm,emily.wong,2025-01-05 16:30:00,yes,f8553ca
-DEP006,search_service,Search index rebuild with new schema,emily.wong,2025-01-08 08:00:00,yes,aaea890
-DEP007,payment_service,Migrated to PayStream v3 payment gateway,david.park,2025-01-10 06:00:00,yes,711bc73
-DEP008,checkout_service,Checkout button CSS fix for iOS small screens,lisa.taylor,2025-01-12 13:20:00,yes,efc4114
-DEP009,payment_service,Hotfix: increased PayStream timeout from 5s to 10s,david.park,2025-01-14 09:30:00,yes,eb9db0a
-DEP010,search_service,Deployed new ranking model v2,emily.wong,2025-01-17 15:00:00,yes,6edfc38
-DEP011,payment_service,Added retry logic for PayStream timeout errors,david.park,2025-01-20 10:45:00,yes,6d89018
-DEP012,notification_service,Fixed email template rendering bug,mike.johnson,2025-01-22 11:30:00,yes,d5ff55d
-DEP013,catalog_service,Menu image CDN migration to CloudFront,sarah.chen,2025-01-25 14:00:00,yes,df7b9ca
-DEP014,user_service,Added user deletion workflow for GDPR,alex.kumar,2025-01-28 09:00:00,yes,e841feb
+DEP001,catalog_service,Expanded breakfast collections for metro cities,ananya.iyer,2024-12-18 09:45:00,yes,d40652b
+DEP002,notification_service,New Year reminder campaign scheduler,rahul.sharma,2024-12-28 13:10:00,yes,6a65a5c
+DEP003,search_service,Restaurant ranking refresh for repeat-order intent,varun.reddy,2025-01-08 07:30:00,yes,5a96341
+DEP004,payment_service,Migrated to RupeeFlow v3 payment orchestration,priya.nair,2025-01-10 06:00:00,yes,266a78e
+DEP005,checkout_service,Retry copy tweak on payment review screen,meera.joshi,2025-01-12 11:20:00,yes,1dae798
+DEP006,payment_service,Hotfix: extended UPI callback timeout thresholds,priya.nair,2025-01-14 08:50:00,yes,e98dedd
+DEP007,payment_service,Partial retry handling for pending UPI confirmations,priya.nair,2025-02-01 10:15:00,yes,6440cb6
+DEP008,catalog_service,Republic Day specials banner and restaurant labels,sakshi.bose,2025-01-24 14:30:00,yes,1b861eb
+DEP009,user_service,Customer support reconciliation workflow,aditya.menon,2025-02-10 16:20:00,yes,4ef5576

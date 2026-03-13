@@ -1,7 +1,7 @@
 """Generic data tools for agentic agents.
 
 Three primitives that replace all rigid skill functions:
-  - query_table: flexible CSV querying with filters, group_by, aggregation
+  - query_table: flexible querying with filters, group_by, aggregation
   - read_document: returns markdown/text file contents
   - describe_tables: schema info for all accessible tables
 
@@ -13,16 +13,22 @@ from __future__ import annotations
 
 import json
 import logging
-from pathlib import Path
 from typing import Any
 
-import pandas as pd
-
+from data_layer.db import (
+    build_where_clause,
+    get_document,
+    get_sample_rows,
+    get_table_columns,
+    get_table_row_count,
+    get_table_schema,
+    query,
+    query_value,
+    table_exists,
+)
 from telemetry_layer.telemetry import AGENT_TABLE_ACCESS
 
 logger = logging.getLogger(__name__)
-
-SCENARIOS_DIR = Path(__file__).resolve().parent.parent.parent / "scenarios"
 
 MAX_RESULT_ROWS = 50
 
@@ -42,8 +48,11 @@ def _validate_access(agent: str, table: str) -> None:
         )
 
 
-def _table_path(scenario_id: str, filename: str) -> Path:
-    return SCENARIOS_DIR / scenario_id / "tables" / filename
+def _table_name(filename: str) -> str:
+    """Convert 'orders.csv' → 'orders'."""
+    if filename.endswith(".csv"):
+        return filename.removesuffix(".csv")
+    return filename
 
 
 # ────────────────────────────────────────────────────
@@ -63,15 +72,12 @@ def query_table(
     sort_order: str = "desc",
     limit: int | None = None,
 ) -> str:
-    """Query a CSV table with optional filters, grouping, aggregation, sorting.
+    """Query a table with optional filters, grouping, aggregation, sorting.
 
     Args:
-        table: CSV filename (e.g. "orders.csv")
+        table: filename (e.g. "orders.csv")
         columns: Optional list of columns to return
-        filters: Dict of column_name -> value or operator conditions:
-                 {"platform": "ios"} — exact match
-                 {"error_rate_pct >": 1.0} — comparison (supports >, <, >=, <=, !=)
-                 {"text contains": "payment"} — substring search (case-insensitive)
+        filters: Dict of column_name -> value or operator conditions
         group_by: Column to group by
         agg: Aggregation function: count, sum, mean, min, max, count_unique, or
              column-specific like "sum:total_amount" or "mean:processing_time_ms"
@@ -84,109 +90,90 @@ def query_table(
     """
     _validate_access(agent, table)
 
-    path = _table_path(scenario_id, table)
-    if not path.exists():
+    tbl = _table_name(table)
+    if not table_exists(scenario_id, tbl):
         return json.dumps({"error": f"Table not found: {table}"})
 
-    df = pd.read_csv(path)
+    all_columns = get_table_columns(scenario_id, tbl)
+    where, params = build_where_clause(filters, all_columns)
 
-    # Apply filters
-    if filters:
-        for key, value in filters.items():
-            parts = key.strip().rsplit(" ", 1)
-            if len(parts) == 2 and parts[1] in (">", "<", ">=", "<=", "!="):
-                col, op = parts
-                col = col.strip()
-                if col not in df.columns:
-                    continue
-                if op == ">":
-                    df = df[df[col] > value]
-                elif op == "<":
-                    df = df[df[col] < value]
-                elif op == ">=":
-                    df = df[df[col] >= value]
-                elif op == "<=":
-                    df = df[df[col] <= value]
-                elif op == "!=":
-                    df = df[df[col] != value]
-            elif len(parts) == 2 and parts[1].lower() == "contains":
-                col = parts[0].strip()
-                if col in df.columns:
-                    df = df[df[col].astype(str).str.contains(str(value), case=False, na=False)]
-            else:
-                # Exact match
-                col = key.strip()
-                if col in df.columns:
-                    df = df[df[col] == value]
-
-    # Select columns (before grouping, to validate)
-    if columns and not group_by:
-        valid_cols = [c for c in columns if c in df.columns]
-        if valid_cols:
-            df = df[valid_cols]
-
-    # Group by + aggregate
-    if group_by and group_by in df.columns:
-        agg_fn = agg or "count"
-
-        # Parse column-specific aggregation: "sum:total_amount"
-        if ":" in agg_fn:
-            fn_name, agg_col = agg_fn.split(":", 1)
-            if agg_col in df.columns:
-                if fn_name == "count_unique":
-                    grouped = df.groupby(group_by)[agg_col].nunique().reset_index()
-                    grouped.columns = [group_by, f"{agg_col}_unique_count"]
-                else:
-                    grouped = df.groupby(group_by)[agg_col].agg(fn_name).reset_index()
-                    grouped.columns = [group_by, f"{agg_col}_{fn_name}"]
-            else:
-                grouped = df.groupby(group_by).size().reset_index(name="count")
-        elif agg_fn == "count":
-            grouped = df.groupby(group_by).size().reset_index(name="count")
-        elif agg_fn == "count_unique":
-            # Count unique across all columns — pick the first non-group column
-            other_cols = [c for c in df.columns if c != group_by]
-            if other_cols:
-                grouped = df.groupby(group_by)[other_cols[0]].nunique().reset_index()
-                grouped.columns = [group_by, f"{other_cols[0]}_unique_count"]
-            else:
-                grouped = df.groupby(group_by).size().reset_index(name="count")
-        else:
-            # Apply agg to all numeric columns
-            numeric_df = df.select_dtypes(include="number")
-            if not numeric_df.empty:
-                numeric_df[group_by] = df[group_by]
-                grouped = numeric_df.groupby(group_by).agg(agg_fn).reset_index()
-            else:
-                grouped = df.groupby(group_by).size().reset_index(name="count")
-
-        df = grouped
-
-    # Sort
-    if sort_by and sort_by in df.columns:
-        df = df.sort_values(sort_by, ascending=(sort_order == "asc"))
-    elif group_by and len(df.columns) >= 2:
-        # Default: sort by the aggregated value column descending
-        val_col = [c for c in df.columns if c != group_by]
-        if val_col:
-            df = df.sort_values(val_col[0], ascending=False)
-
-    # Limit
-    total_rows = len(df)
     effective_limit = min(limit or MAX_RESULT_ROWS, MAX_RESULT_ROWS)
-    df = df.head(effective_limit)
+
+    if group_by and group_by in all_columns:
+        # Grouped query
+        agg_fn = agg or "count"
+        select_expr, val_col = _build_group_select(group_by, agg_fn, all_columns)
+
+        # Count total groups
+        count_sql = f"SELECT COUNT(*) FROM (SELECT [{group_by}] FROM [{tbl}] {where} GROUP BY [{group_by}])"
+        total_rows = query_value(scenario_id, count_sql, params) or 0
+
+        # Sort
+        order_col = sort_by if sort_by and sort_by in (all_columns + [val_col]) else val_col
+        direction = "ASC" if sort_order == "asc" else "DESC"
+
+        sql = f"SELECT {select_expr} FROM [{tbl}] {where} GROUP BY [{group_by}] ORDER BY [{order_col}] {direction} LIMIT ?"
+        data = query(scenario_id, sql, params + [effective_limit])
+        result_columns = list(data[0].keys()) if data else [group_by, val_col]
+    else:
+        # Non-grouped query
+        if columns:
+            valid_cols = [c for c in columns if c in all_columns]
+            select_cols = ", ".join(f"[{c}]" for c in valid_cols) if valid_cols else "*"
+        else:
+            select_cols = "*"
+
+        # Count total matching rows
+        count_sql = f"SELECT COUNT(*) FROM [{tbl}] {where}"
+        total_rows = query_value(scenario_id, count_sql, params) or 0
+
+        order_clause = ""
+        if sort_by and sort_by in all_columns:
+            direction = "ASC" if sort_order == "asc" else "DESC"
+            order_clause = f"ORDER BY [{sort_by}] {direction}"
+
+        sql = f"SELECT {select_cols} FROM [{tbl}] {where} {order_clause} LIMIT ?"
+        data = query(scenario_id, sql, params + [effective_limit])
+        result_columns = list(data[0].keys()) if data else all_columns
 
     result = {
         "table": table,
         "total_matching_rows": total_rows,
-        "returned_rows": len(df),
-        "columns": list(df.columns),
-        "data": df.to_dict(orient="records"),
+        "returned_rows": len(data),
+        "columns": result_columns,
+        "data": data,
     }
     if total_rows > effective_limit:
         result["note"] = f"Showing top {effective_limit} of {total_rows} rows. Refine filters for more specific results."
 
     return json.dumps(result, default=str)
+
+
+def _build_group_select(group_by: str, agg_fn: str, all_columns: list[str]) -> tuple[str, str]:
+    """Build SELECT expression for grouped queries. Returns (select_expr, value_column_name)."""
+    if ":" in agg_fn:
+        fn_name, agg_col = agg_fn.split(":", 1)
+        if agg_col in all_columns:
+            if fn_name == "count_unique":
+                val_col = f"{agg_col}_unique_count"
+                return f"[{group_by}], COUNT(DISTINCT [{agg_col}]) AS [{val_col}]", val_col
+            else:
+                sql_fn = {"sum": "SUM", "mean": "AVG", "avg": "AVG", "min": "MIN", "max": "MAX"}.get(fn_name, "SUM")
+                val_col = f"{agg_col}_{fn_name}"
+                return f"[{group_by}], {sql_fn}([{agg_col}]) AS [{val_col}]", val_col
+        return f"[{group_by}], COUNT(*) AS [count]", "count"
+
+    if agg_fn == "count":
+        return f"[{group_by}], COUNT(*) AS [count]", "count"
+    if agg_fn == "count_unique":
+        other_cols = [c for c in all_columns if c != group_by]
+        if other_cols:
+            val_col = f"{other_cols[0]}_unique_count"
+            return f"[{group_by}], COUNT(DISTINCT [{other_cols[0]}]) AS [{val_col}]", val_col
+        return f"[{group_by}], COUNT(*) AS [count]", "count"
+
+    # Apply agg to all numeric-like columns — just use count as fallback
+    return f"[{group_by}], COUNT(*) AS [count]", "count"
 
 
 # ────────────────────────────────────────────────────
@@ -195,17 +182,16 @@ def query_table(
 
 
 def read_document(scenario_id: str, agent: str, filename: str) -> str:
-    """Read a markdown or text file from the scenario tables directory.
+    """Read a markdown or text file from the scenario data.
 
     Returns the full content of the file.
     """
     _validate_access(agent, filename)
 
-    path = _table_path(scenario_id, filename)
-    if not path.exists():
+    content = get_document(scenario_id, filename)
+    if content is None:
         return json.dumps({"error": f"Document not found: {filename}"})
 
-    content = path.read_text()
     return json.dumps({"filename": filename, "content": content})
 
 
@@ -223,31 +209,34 @@ def describe_tables(scenario_id: str, agent: str) -> str:
     tables_info = []
 
     for filename in allowed:
-        path = _table_path(scenario_id, filename)
-        if not path.exists():
-            tables_info.append({"name": filename, "status": "not_found"})
-            continue
-
         if filename.endswith(".csv"):
-            df = pd.read_csv(path)
-            col_info = [{"name": c, "dtype": str(df[c].dtype)} for c in df.columns]
-            sample = df.head(2).to_dict(orient="records")
+            tbl = _table_name(filename)
+            if not table_exists(scenario_id, tbl):
+                tables_info.append({"name": filename, "status": "not_found"})
+                continue
+
+            schema = get_table_schema(scenario_id, tbl)
+            col_info = [{"name": s["name"], "dtype": s["type"]} for s in schema]
+            row_count = get_table_row_count(scenario_id, tbl)
+            sample = get_sample_rows(scenario_id, tbl, 2)
 
             # Date range detection
-            date_cols = [c for c in df.columns if any(kw in c.lower() for kw in ("date", "timestamp", "created_at", "_at"))]
+            date_cols = [s["name"] for s in schema if any(kw in s["name"].lower() for kw in ("date", "timestamp", "created_at", "_at"))]
             date_range = None
             if date_cols:
                 dc = date_cols[0]
                 try:
-                    dates = pd.to_datetime(df[dc])
-                    date_range = {"column": dc, "min": str(dates.min()), "max": str(dates.max())}
+                    min_val = query_value(scenario_id, f"SELECT MIN([{dc}]) FROM [{tbl}]")
+                    max_val = query_value(scenario_id, f"SELECT MAX([{dc}]) FROM [{tbl}]")
+                    if min_val and max_val:
+                        date_range = {"column": dc, "min": str(min_val), "max": str(max_val)}
                 except Exception:
                     pass
 
             info: dict[str, Any] = {
                 "name": filename,
                 "type": "csv",
-                "rows": len(df),
+                "rows": row_count,
                 "columns": col_info,
                 "sample": sample,
             }
@@ -256,7 +245,10 @@ def describe_tables(scenario_id: str, agent: str) -> str:
             tables_info.append(info)
 
         elif filename.endswith(".md"):
-            content = path.read_text()
+            content = get_document(scenario_id, filename)
+            if content is None:
+                tables_info.append({"name": filename, "status": "not_found"})
+                continue
             tables_info.append({
                 "name": filename,
                 "type": "markdown",

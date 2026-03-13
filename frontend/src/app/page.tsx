@@ -1,19 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { listScenarios, startSession, type Scenario } from "@/lib/api";
+import { startSession } from "@/lib/api";
 
 export default function LandingPage() {
   const router = useRouter();
-  const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    listScenarios()
-      .then((data) => setScenarios(data.scenarios))
-      .catch(console.error);
-  }, []);
 
   const handleStart = async () => {
     setLoading(true);
@@ -65,7 +58,7 @@ export default function LandingPage() {
               Critical Incident
             </div>
             <h2 className="text-slate-900 dark:text-white text-4xl md:text-5xl font-black leading-tight tracking-tight mb-2">
-              Food Delivery: <span className="text-[#10B981]">The Retention Crisis</span>
+              India Food Delivery: <span className="text-[#10B981]">The Checkout Trust Crisis</span>
             </h2>
             <p className="text-slate-500 dark:text-slate-400 text-lg">
               Simulation Module #124 &bull; Strategy &amp; Analytics Focus
@@ -81,7 +74,7 @@ export default function LandingPage() {
                       <span className="material-symbols-outlined text-4xl">monitoring</span>
                       <div>
                         <p className="text-xs font-bold uppercase opacity-70">Internal Metrics Dashboard</p>
-                        <p className="font-medium">Active Orders: -18% MoM</p>
+                        <p className="font-medium">Payment reliability is slipping across top metros</p>
                       </div>
                     </div>
                   </div>
@@ -93,9 +86,7 @@ export default function LandingPage() {
                     The Scenario
                   </h3>
                   <p className="text-slate-600 dark:text-slate-300 text-lg leading-relaxed mb-8">
-                    You are the Product Manager for a high-growth food delivery platform. Recently, your executive dashboard flagged a concerning trend:{" "}
-                    <span className="text-slate-900 dark:text-white font-semibold">Weekly orders have dropped by 18%</span>{" "}
-                    over the past month. Preliminary data shows competitors are maintaining steady volume. Your mission is to investigate the root cause, identify the leaking segments, and propose a data-backed recovery plan to the leadership team.
+                    You are the Product Manager for <span className="text-slate-900 dark:text-white font-semibold">ZaikaNow</span>, an India-native food delivery marketplace. Leadership has flagged a late-January slowdown in completed orders across key metros while major competitors continue to hold steady. Your mission is to investigate whether the problem is traffic, checkout conversion, or payment reliability, then present a data-backed recovery plan.
                   </p>
                   <div className="flex flex-wrap items-center gap-4">
                     <button
@@ -134,7 +125,7 @@ export default function LandingPage() {
                   Key Objectives
                 </h4>
                 <ul className="space-y-4">
-                  {["Hypothesis generation for traffic decline", "Data-driven funnel analysis", "Prioritization of high-impact fixes", "Stakeholder communication strategy"].map((obj) => (
+                  {["Find the broken payment step", "Segment impact by city, platform, and method", "Separate root cause from red herrings", "Recommend technical and trust-recovery actions"].map((obj) => (
                     <li key={obj} className="flex items-start gap-3">
                       <span className="material-symbols-outlined text-green-500 mt-0.5">check_circle</span>
                       <span className="text-slate-600 dark:text-slate-300 text-sm">{obj}</span>
@@ -145,7 +136,7 @@ export default function LandingPage() {
               <div className="p-6 rounded-xl bg-[#10B981]/10 border border-[#10B981]/20">
                 <h4 className="text-[#10B981] font-bold mb-2">Sim Tip</h4>
                 <p className="text-slate-600 dark:text-slate-400 text-xs leading-relaxed">
-                  Pay close attention to the <span className="font-bold">user feedback logs</span> in the resource section. Often, quantitative drops are preceded by qualitative shifts in sentiment.
+                  Pay close attention to the <span className="font-bold">support tickets and usability findings</span>. In payment incidents, trust damage can persist even after the technical metrics start to improve.
                 </p>
               </div>
               <div className="p-1 rounded-xl bg-gradient-to-br from-[#10B981] via-[#10B981]/50 to-teal-500">
