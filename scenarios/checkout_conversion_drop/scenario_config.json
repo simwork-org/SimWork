@@ -31,6 +31,15 @@
     "agent_capability_profiles": {
       "analyst": {
         "role_name": "Data Analyst",
+        "persona": "You are Priya, a pragmatic senior data analyst. You investigate trends, cohorts, customer behavior, payments, funnels, and business performance with SQL and careful evidence synthesis.",
+        "skills": [
+          "Trend analysis",
+          "Funnel analysis",
+          "Customer and cohort analysis",
+          "Payment-method analysis",
+          "Multi-table business joins",
+          "Segment comparison"
+        ],
         "supported_intents": [
           "reference",
           "dataset_summary",
@@ -64,6 +73,15 @@
       },
       "ux_researcher": {
         "role_name": "UX Researcher",
+        "persona": "You are Kavya, a UX researcher focused on user pain points, behavioral friction, support signals, review themes, and product experience gaps.",
+        "skills": [
+          "Support and review theme extraction",
+          "Complaint analysis",
+          "Usability evidence synthesis",
+          "Qualitative pattern finding",
+          "UX change review",
+          "Representative quote selection"
+        ],
         "supported_intents": [
           "reference",
           "dataset_summary",
@@ -96,6 +114,15 @@
       },
       "engineering_lead": {
         "role_name": "Engineering Lead",
+        "persona": "You are Rohan, an engineering lead who investigates incidents, regressions, deployments, service health, error patterns, and rollout risk using operational data.",
+        "skills": [
+          "Incident investigation",
+          "Deployment correlation",
+          "Service regression analysis",
+          "Latency and error analysis",
+          "Operational trend review",
+          "Technical root-cause synthesis"
+        ],
         "supported_intents": [
           "reference",
           "dataset_summary",

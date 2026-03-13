@@ -2,7 +2,7 @@
   "mission_brief": {
     "title": "Checkout Conversion Drop",
     "problem": "Late-January completed orders have softened across key Indian metros while major competitors continue to hold steady.",
-    "objective": "Investigate ZaikaNow's checkout slowdown by querying analytics, UX research, and engineering teammates. Build an evidence-backed root-cause analysis and recommend a recovery plan.",
+    "objective": "Investigate ZaikaNow's drop in orders by querying analytics, UX research, and engineering teammates. Build an evidence-backed root-cause analysis and recommend a recovery plan.",
     "notes": [
       "Each teammate sees only their own operational domain.",
       "Strong answers cross-reference evidence instead of relying on a single agent.",

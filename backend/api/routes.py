@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -48,11 +48,11 @@ class SaveEvidenceRequest(BaseModel):
     query_log_id: int
     citation_id: str
     agent: str
-    annotation: str | None = None
+    annotation: Optional[str] = None
 
 
 class UpdateEvidenceAnnotationRequest(BaseModel):
-    annotation: str | None = None
+    annotation: Optional[str] = None
 
 
 class ProposedActionRequest(BaseModel):

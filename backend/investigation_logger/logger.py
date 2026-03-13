@@ -32,6 +32,7 @@ def _ensure_query_log_columns(conn: sqlite3.Connection) -> None:
         "citations_json": "TEXT",
         "warnings_json": "TEXT",
         "planner_json": "TEXT",
+        "attempts_json": "TEXT",
     }
     existing = _table_columns(conn, "query_logs")
     for column, data_type in wanted.items():
@@ -143,6 +144,24 @@ def init_db() -> None:
     conn.close()
 
 
+def clear_all_session_data() -> None:
+    """Remove all persisted session-scoped data."""
+    conn = _get_conn()
+    conn.executescript(
+        """
+        DELETE FROM scoring_results;
+        DELETE FROM saved_evidence;
+        DELETE FROM session_events;
+        DELETE FROM submissions;
+        DELETE FROM hypothesis_logs;
+        DELETE FROM query_logs;
+        DELETE FROM sessions;
+        """
+    )
+    conn.commit()
+    conn.close()
+
+
 def create_session(session_id: str, candidate_id: str, scenario_id: str) -> None:
     conn = _get_conn()
     conn.execute(
@@ -163,6 +182,7 @@ def log_query(
     citations: list[dict[str, Any]] | None = None,
     warnings: list[str] | None = None,
     planner: dict[str, Any] | None = None,
+    attempts: list[dict[str, Any]] | None = None,
 ) -> int:
     conn = _get_conn()
     _ensure_query_log_columns(conn)
@@ -177,8 +197,9 @@ def log_query(
             citations_json,
             warnings_json,
             planner_json,
+            attempts_json,
             timestamp
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             session_id,
@@ -189,6 +210,7 @@ def log_query(
             json.dumps(citations or []),
             json.dumps(warnings or []),
             json.dumps(planner or {}),
+            json.dumps(attempts or []),
             _utcnow(),
         ),
     )

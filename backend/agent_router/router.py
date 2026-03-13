@@ -1,74 +1,47 @@
-"""Agent router — evidence-first planning, execution, and synthesis."""
+"""Agent router — iterative role-based investigation over scoped SQL access."""
 
 from __future__ import annotations
 
 import json
 import logging
+import uuid
 from typing import Any
 
-from agent_router.evidence import execute_operations, get_agent_source_metadata, summarize_evidence
+from data_layer.db import (
+    execute_authorized_select,
+    get_document,
+    get_sample_rows,
+    get_table_columns,
+    get_table_row_count,
+    get_table_schema,
+)
 from llm_interface.llm_client import LLMClient
-from scenario_loader.loader import get_agent_capability_profile
+from scenario_loader.loader import get_agent_role_config
 from telemetry_layer.telemetry import VALID_AGENTS
 
 logger = logging.getLogger(__name__)
 
-AGENT_PERSONAS: dict[str, str] = {
-    "analyst": (
-        "You are Priya, Senior Data Analyst at ZaikaNow. You focus on business metrics, trends, funnels, "
-        "segments, orders, and payments. You do not speculate about UX or engineering causes outside your evidence."
-    ),
-    "ux_researcher": (
-        "You are Kavya, UX Researcher at ZaikaNow. You focus on qualitative feedback, usability, support tickets, "
-        "and UX changes. You do not speculate about engineering metrics or analytics outside your evidence."
-    ),
-    "engineering_lead": (
-        "You are Rohan, Engineering Lead at ZaikaNow. You focus on deployments, service health, architecture, "
-        "and payment errors. You do not speculate about product analytics or qualitative feedback outside your evidence."
-    ),
+MAX_HISTORY_ITEMS = 12
+MAX_INVESTIGATION_ATTEMPTS = 4
+MAX_RESULT_ROWS = 12
+
+PLAN_SCHEMA = {
+    "question_understanding": "Short summary of the user's ask",
+    "complexity": "single_query | multi_step",
+    "sub_questions": ["Optional sub-question"],
+    "target_tables": ["Allowed source name such as orders.csv"],
+    "stop_condition": "What evidence is enough to answer",
+    "next_steps": ["Follow-up the user might ask next"],
 }
 
-PLANNER_RESPONSE_SCHEMA = {
-    "intent": "lookup | compare | trend | funnel | explain | summarize",
-    "intent_class": "reference | dataset_summary | schema_question | investigation | comparison | trend_analysis | root_cause_analysis | quote_lookup | incident_timeline",
+ACTION_SCHEMA = {
+    "action": "sql | document | finish",
+    "reason": "Short rationale",
+    "sql": "Read-only SQL query when action is sql",
+    "document": "Allowed markdown source name when action is document",
+    "document_terms": ["Optional search terms for document excerpts"],
+    "title": "Human-friendly title for the resulting evidence",
     "answer_mode": "metric | chart | table | text",
-    "operations": [
-        {
-            "alias": "short_name_for_reuse",
-            "type": "lookup_rows | rank_rows | aggregate_breakdown | aggregate_timeseries | compute_funnel | read_document_excerpt | summarize_source_profile | summarize_date_span | compare_segments | summarize_metric_delta | extract_feedback_themes | select_representative_quotes | count_issue_mentions | summarize_ux_change_impact | build_incident_timeline | correlate_deployments_with_metrics | summarize_error_shift | compare_pre_post_rollout",
-            "source": "allowed source filename",
-            "title": "artifact title",
-        }
-    ],
-    "needs_clarification": None,
-    "pending_follow_up": {
-        "prompt": "Short follow-up question for the user",
-        "choices": ["Concrete follow-up choice"],
-        "default_choice": "Default choice used when the user says yes",
-        "resolved_query_template": "{choice}",
-    },
-    "next_steps": ["follow-up prompt"],
-}
-
-DOMAIN_KEYWORDS: dict[str, set[str]] = {
-    "analyst": {
-        "orders", "revenue", "trend", "trends", "funnel", "conversion", "segment", "segments",
-        "platform", "os", "payment", "payments", "users", "customer", "cohort", "daily", "weekly",
-    },
-    "ux_researcher": {
-        "review", "reviews", "ticket", "tickets", "feedback", "usability", "research", "sentiment",
-        "complaint", "complaints", "ux", "users saying",
-    },
-    "engineering_lead": {
-        "deployment", "deployments", "latency", "error", "errors", "service", "services", "incident",
-        "architecture", "timeout", "gateway", "p95", "p99", "rollback",
-    },
-}
-
-DOMAIN_REDIRECTS = {
-    "analyst": "That question belongs with Priya, the Data Analyst.",
-    "ux_researcher": "That question belongs with Kavya, the UX Researcher.",
-    "engineering_lead": "That question belongs with Rohan, the Engineering Lead.",
 }
 
 
@@ -84,736 +57,675 @@ def route_query(
     query: str,
     conversation_history: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Route a candidate query through planner, deterministic execution, and synthesis."""
+    """Plan an investigation, execute scoped queries, and synthesize the answer."""
     validate_agent(agent)
     history = conversation_history or []
-    follow_up_resolution = _resolve_follow_up_query(agent, query, history)
 
-    if follow_up_resolution.get("handled_response"):
-        pending_follow_up = follow_up_resolution.get("pending_follow_up")
-        return {
-            "agent": agent,
-            "response": follow_up_resolution["handled_response"],
-            "artifacts": [],
-            "citations": [],
-            "warnings": [follow_up_resolution["note"]] if follow_up_resolution.get("note") else [],
-            "next_steps": pending_follow_up.get("choices", []) if pending_follow_up else [],
-            "pending_follow_up": pending_follow_up,
-            "intent_class": "reference",
-            "_planner": {
-                "original_query": query,
-                "effective_query": query,
-                "pending_follow_up": pending_follow_up,
-                "next_steps": pending_follow_up.get("choices", []) if pending_follow_up else [],
-            },
-        }
-
-    effective_query = follow_up_resolution["effective_query"]
-
-    redirect = _domain_redirect(agent, effective_query)
-    if redirect:
-        return {
-            "agent": agent,
-            "response": redirect,
-            "artifacts": [],
-            "citations": [],
-            "warnings": [redirect],
-            "next_steps": [],
-            "pending_follow_up": None,
-            "intent_class": "reference",
-        }
-
-    source_metadata = get_agent_source_metadata(scenario_id, agent)
-    capability_profile = get_agent_capability_profile(scenario_id, agent)
-    prior_summaries = summarize_evidence(history, agent)
+    role = get_agent_role_config(scenario_id, agent)
+    source_metadata = _build_source_metadata(scenario_id, role["allowed_tables"])
+    shared_context = _build_shared_context(history)
     last_turn_context = _last_agent_turn_context(history, agent)
 
-    planner, planner_warning = _plan_query(
-        llm,
-        scenario_id,
-        agent,
-        effective_query,
-        source_metadata,
-        capability_profile,
-        prior_summaries,
-        last_turn_context,
+    plan, plan_warning = _plan_investigation(
+        llm=llm,
+        agent=agent,
+        role=role,
+        query=query,
+        source_metadata=source_metadata,
+        shared_context=shared_context,
+        last_turn_context=last_turn_context,
     )
-    planner = _apply_deterministic_intent_plan(agent, effective_query, planner, source_metadata)
-    intent_class = _resolve_intent_class(agent, effective_query, planner, source_metadata)
-    execution = execute_operations(
+
+    evidence, attempts, warnings = _run_investigation_loop(
+        llm=llm,
         scenario_id=scenario_id,
         agent=agent,
-        operations=planner.get("operations", []),
-        query_text=effective_query,
-        answer_mode=planner.get("answer_mode", "table"),
-        intent_class=intent_class,
-        capability_profile=capability_profile,
+        role=role,
+        query=query,
+        plan=plan,
+        source_metadata=source_metadata,
+        shared_context=shared_context,
     )
+    if plan_warning:
+        warnings.append(plan_warning)
 
-    warnings = execution["warnings"][:]
-    if planner_warning:
-        warnings.append(planner_warning)
-    if follow_up_resolution.get("note"):
-        warnings.append(follow_up_resolution["note"])
-    if planner.get("needs_clarification"):
-        warnings.append(str(planner["needs_clarification"]))
-
-    pending_follow_up = _resolve_pending_follow_up(planner, effective_query, execution["artifacts"])
-    next_steps = planner.get("next_steps") or _default_next_steps(agent, effective_query)
+    artifacts, citations = _build_artifacts_and_citations(evidence, agent)
     response = _synthesize_response(
         llm=llm,
         agent=agent,
-        query=effective_query,
-        planner=planner,
-        intent_class=intent_class,
-        citations=execution["citations"],
+        role=role,
+        query=query,
+        plan=plan,
+        evidence=evidence,
         warnings=warnings,
-        artifacts=execution["artifacts"],
-        evidence=execution["evidence"],
-        next_steps=next_steps,
-        pending_follow_up=pending_follow_up,
+        shared_context=shared_context,
     )
-
-    planner_context = {
-        **planner,
-        "intent_class": intent_class,
-        "next_steps": next_steps,
-        "original_query": query,
-        "effective_query": effective_query,
-        "pending_follow_up": pending_follow_up,
-    }
 
     return {
         "agent": agent,
         "response": response,
-        "artifacts": execution["artifacts"],
-        "citations": execution["citations"],
-        "warnings": warnings,
-        "next_steps": next_steps,
-        "pending_follow_up": pending_follow_up,
-        "intent_class": intent_class,
-        "_planner": planner_context,
+        "artifacts": artifacts,
+        "citations": citations,
+        "warnings": _unique_preserve(warnings),
+        "next_steps": plan.get("next_steps") or _default_next_steps(role),
+        "pending_follow_up": None,
+        "intent_class": "investigation",
+        "_planner": {
+            **plan,
+            "shared_context_summary": shared_context,
+            "attempt_count": len(attempts),
+        },
+        "_attempts": attempts,
     }
 
 
-def _plan_query(
+def _plan_investigation(
     llm: LLMClient,
-    scenario_id: str,
     agent: str,
+    role: dict[str, Any],
     query: str,
     source_metadata: list[dict[str, Any]],
-    capability_profile: dict[str, Any],
-    prior_summaries: list[str],
+    shared_context: list[dict[str, Any]],
     last_turn_context: dict[str, Any] | None,
 ) -> tuple[dict[str, Any], str | None]:
-    system = (
-        f"{AGENT_PERSONAS[agent]}\n\n"
-        "Plan the minimum set of deterministic data operations needed to answer the current question. "
-        "Do not answer the user. Return JSON only.\n\n"
-        "Rules:\n"
-        "- Use only the listed sources.\n"
-        "- Stay within the agent's supported intents and operations.\n"
-        "- Prefer 1-3 operations.\n"
-        "- If later operations depend on earlier rows, give the earlier op an alias and refer to values as $alias.rows.0.column.\n"
-        "- If the question is ambiguous, set needs_clarification to a short explanation but still provide the safest plan you can.\n"
-        "- answer_mode must be one of metric, chart, table, text.\n"
-        "- For singular requests like first/top/latest, use sort_by + limit 1 so tie detection can run.\n"
-        "- For document questions, use read_document_excerpt.\n"
-        "- For dataset summaries, schema questions, or date-range questions, prefer summarize_source_profile or summarize_date_span.\n"
-        "- For UX themes or quotes, prefer extract_feedback_themes, count_issue_mentions, or select_representative_quotes.\n"
-        "- For engineering timelines or rollout analysis, prefer build_incident_timeline, summarize_error_shift, or compare_pre_post_rollout.\n"
-        f"Return exactly this JSON shape: {json.dumps(PLANNER_RESPONSE_SCHEMA)}"
+    system = _role_system_prompt(agent, role) + (
+        "\n\nCreate a short investigation plan before querying data. "
+        "Decide whether the question looks solvable with one query or needs multiple steps. "
+        "Return JSON only."
     )
     user = json.dumps(
         {
-            "scenario_id": scenario_id,
             "question": query,
-            "capability_profile": capability_profile,
-            "sources": source_metadata,
-            "recent_evidence_summaries": prior_summaries,
+            "allowed_sources": source_metadata,
+            "shared_context": shared_context,
             "last_agent_turn": last_turn_context,
+            "response_schema": PLAN_SCHEMA,
         },
         ensure_ascii=True,
     )
+    plan, error = _chat_json(
+        llm=llm,
+        system=system,
+        payload={
+            "question": query,
+            "allowed_sources": source_metadata,
+            "shared_context": shared_context,
+            "last_agent_turn": last_turn_context,
+            "response_schema": PLAN_SCHEMA,
+        },
+        normalize=lambda value: _normalize_plan(value, source_metadata),
+        purpose="planner",
+    )
+    if plan is not None:
+        return plan, None
+    return _generic_plan(source_metadata), f"Planner could not produce valid structured output: {error}"
 
-    try:
-        planner = llm.chat(system=system, user=user)
-        if not isinstance(planner, dict):
-            raise ValueError("Planner did not return a JSON object")
-        planner.setdefault("intent", "summarize")
-        planner.setdefault("intent_class", _resolve_intent_class(agent, query, planner, source_metadata))
-        planner.setdefault("answer_mode", "table")
-        planner.setdefault("operations", [])
-        planner.setdefault("next_steps", [])
-        planner.setdefault("needs_clarification", None)
-        planner["pending_follow_up"] = _normalize_pending_follow_up(planner.get("pending_follow_up"))
-        return planner, None
-    except Exception as exc:
-        logger.warning("Planner failed, using deterministic fallback: %s", exc)
-        return _fallback_plan(query, source_metadata), "Planner fallback used due to invalid planner output."
 
+def _run_investigation_loop(
+    llm: LLMClient,
+    scenario_id: str,
+    agent: str,
+    role: dict[str, Any],
+    query: str,
+    plan: dict[str, Any],
+    source_metadata: list[dict[str, Any]],
+    shared_context: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[str]]:
+    warnings: list[str] = []
+    attempts: list[dict[str, Any]] = []
+    evidence: list[dict[str, Any]] = []
+    allowed_sql_tables = {
+        source.removesuffix(".csv")
+        for source in role.get("allowed_tables", [])
+        if source.endswith(".csv")
+    }
 
-def _fallback_plan(query: str, source_metadata: list[dict[str, Any]]) -> dict[str, Any]:
-    q = query.lower()
-    source_names = [item["name"] for item in source_metadata]
+    for attempt_no in range(1, MAX_INVESTIGATION_ATTEMPTS + 1):
+        action, action_warning = _choose_next_action(
+            llm=llm,
+            agent=agent,
+            role=role,
+            query=query,
+            plan=plan,
+            source_metadata=source_metadata,
+            shared_context=shared_context,
+            attempts=attempts,
+            evidence=evidence,
+        )
+        if action_warning:
+            warnings.append(action_warning)
 
-    if any(token in q for token in ("each dataset", "each table", "all datasets", "all tables", "dataset summary", "summarize the datasets")):
-        return {
-            "intent": "summarize",
-            "intent_class": "dataset_summary",
-            "answer_mode": "text",
-            "operations": [
+        action_type = action.get("action")
+        if action_type == "finish":
+            break
+
+        if action_type == "document":
+            record = _execute_document_step(
+                scenario_id=scenario_id,
+                action=action,
+                allowed_sources=role.get("allowed_tables", []),
+                query=query,
+            )
+        else:
+            record = _execute_sql_step(
+                scenario_id=scenario_id,
+                action=action,
+                allowed_sql_tables=allowed_sql_tables,
+            )
+
+        record["attempt"] = attempt_no
+        attempts.append(record)
+
+        if record["status"] == "success" and record.get("rows"):
+            evidence.append(
                 {
-                    "type": "summarize_source_profile",
-                    "source": source_name,
-                    "title": f"{source_name} profile",
+                    "evidence_id": f"ev_{uuid.uuid4().hex[:8]}",
+                    "title": record.get("title") or f"Attempt {attempt_no}",
+                    "rows": record.get("rows", []),
+                    "columns": record.get("columns", []),
+                    "answer_mode": record.get("answer_mode", "table"),
+                    "summary": _summarize_attempt(record),
+                    "sources": record.get("sources", []),
+                    "query": record.get("sql"),
+                    "kind": record.get("kind"),
+                    "truncated": record.get("truncated", False),
                 }
-                for source_name in source_names[:6]
-            ],
-            "needs_clarification": None,
-            "pending_follow_up": None,
-            "next_steps": [],
-        }
+            )
+            if plan.get("complexity") == "single_query":
+                break
+            continue
 
-    if any(token in q for token in ("date range", "duration", "how long", "span", "coverage")):
-        explicit_source = next((name for name in source_names if name in q), None)
-        target_source = explicit_source or (source_names[0] if source_names else "")
-        return {
-            "intent": "summarize",
-            "intent_class": "schema_question",
-            "answer_mode": "text",
-            "operations": [{
-                "type": "summarize_date_span",
-                "source": target_source,
-                "title": f"{target_source} date coverage",
-            }],
-            "needs_clarification": None,
-            "pending_follow_up": None,
-            "next_steps": [],
-        }
+        if record["status"] == "error":
+            warnings.append(record.get("error") or "Query attempt failed.")
+            continue
 
-    if "funnel" in q and "sessions_events.csv" in source_names:
-        return {
-            "intent": "funnel",
-            "intent_class": "investigation",
-            "answer_mode": "chart",
-            "operations": [{
-                "type": "compute_funnel",
-                "source": "sessions_events.csv",
-                "title": "Checkout funnel",
-            }],
-            "needs_clarification": None,
-            "pending_follow_up": {
-                "prompt": "Would you like to break down the funnel by platform or app version?",
-                "choices": [
-                    "Break down the funnel by platform.",
-                    "Break down the funnel by app version.",
-                ],
-                "default_choice": "Break down the funnel by platform.",
-                "resolved_query_template": "{choice}",
-            },
-            "next_steps": [
-                "Break down the funnel by platform.",
-                "Break down the funnel by app version.",
-            ],
-        }
+        if record["status"] == "success" and not record.get("rows"):
+            warnings.append(f"{record.get('title') or 'Query attempt'} returned no rows.")
 
-    if any(token in q for token in ("trend", "daily", "weekly", "monthly", "over time")):
-        source = "orders.csv" if "orders.csv" in source_names else source_names[0]
-        granularity = "month" if "month" in q else "day"
-        return {
-            "intent": "trend",
-            "intent_class": "trend_analysis",
-            "answer_mode": "chart",
-            "operations": [{
-                "type": "aggregate_timeseries",
-                "source": source,
-                "metric": "order_id" if source == "orders.csv" else None,
-                "agg": "count",
-                "granularity": granularity,
-                "group_by": "platform" if any(token in q for token in ("platform", "os")) and source == "orders.csv" else None,
-                "title": "Trend analysis",
-            }],
-            "needs_clarification": None,
-            "pending_follow_up": {
-                "prompt": "Would you like to break down the trend further?",
-                "choices": [
-                    "Break down the previous trend by platform.",
-                    "Break down the previous trend by order status.",
-                    "Show the previous trend aggregated monthly.",
-                ],
-                "default_choice": "Break down the previous trend by platform.",
-                "resolved_query_template": "{choice}",
-            },
-            "next_steps": [
-                "Break down the previous trend by platform.",
-                "Break down the previous trend by order status.",
-                "Show the previous trend aggregated monthly.",
-            ],
-        }
-
-    if any(token in q for token in ("split", "break down", "by platform", "by os")):
-        source = "orders.csv" if "orders.csv" in source_names else source_names[0]
-        columns = _source_columns(source_metadata, source)
-        return {
-            "intent": "compare",
-            "intent_class": "comparison",
-            "answer_mode": "chart",
-            "operations": [{
-                "type": "aggregate_breakdown",
-                "source": source,
-                "group_by": "platform" if "platform" in columns else (columns[0] if columns else "platform"),
-                "metric": "order_id" if source == "orders.csv" else None,
-                "agg": "count",
-                "title": "Breakdown",
-            }],
-            "needs_clarification": None,
-            "pending_follow_up": {
-                "prompt": "Would you like to continue the breakdown?",
-                "choices": [
-                    "Show the same breakdown over time.",
-                    "Rank the strongest and weakest segments in the previous breakdown.",
-                ],
-                "default_choice": "Show the same breakdown over time.",
-                "resolved_query_template": "{choice}",
-            },
-            "next_steps": [
-                "Show the same breakdown over time.",
-                "Rank the strongest and weakest segments in the previous breakdown.",
-            ],
-        }
-
-    if "first customer" in q and "users.csv" in source_names:
-        return {
-            "intent": "lookup",
-            "intent_class": "investigation",
-            "answer_mode": "table",
-            "operations": [{
-                "alias": "first_users",
-                "type": "lookup_rows",
-                "source": "users.csv",
-                "columns": ["user_id", "name", "signup_date", "platform", "city", "user_type"],
-                "sort_by": "signup_date",
-                "sort_order": "asc",
-                "limit": 1,
-                "title": "Earliest signed up users",
-            }],
-            "needs_clarification": "There may not be a single first customer if multiple users share the same earliest signup date.",
-            "next_steps": [],
-        }
-
-    default_source = source_names[0] if source_names else ""
-    if default_source.endswith(".md"):
-        operations = [{
-            "type": "read_document_excerpt",
-            "source": default_source,
-            "title": "Relevant document excerpts",
-        }]
-    else:
-        operations = [{
-            "type": "lookup_rows",
-            "source": default_source,
-            "limit": 5,
-            "title": "Relevant rows",
-        }]
-    return {
-        "intent": "summarize",
-        "intent_class": "reference",
-        "answer_mode": "table",
-        "operations": operations,
-        "needs_clarification": "I used a conservative fallback plan because the planner could not interpret the question confidently.",
-        "pending_follow_up": None,
-        "next_steps": [],
-    }
+    if not evidence and attempts:
+        warnings.append("The agent could not find strong evidence within the allowed attempt limit.")
+    return evidence, attempts, warnings
 
 
-def _resolve_intent_class(
+def _choose_next_action(
+    llm: LLMClient,
     agent: str,
+    role: dict[str, Any],
     query: str,
-    planner: dict[str, Any],
+    plan: dict[str, Any],
     source_metadata: list[dict[str, Any]],
-) -> str:
-    explicit = str(planner.get("intent_class") or "").strip().lower()
-    allowed = {
-        "reference", "dataset_summary", "schema_question", "investigation", "comparison",
-        "trend_analysis", "root_cause_analysis", "quote_lookup", "incident_timeline",
-    }
-    if explicit in allowed:
-        return explicit
+    shared_context: list[dict[str, Any]],
+    attempts: list[dict[str, Any]],
+    evidence: list[dict[str, Any]],
+) -> tuple[dict[str, Any], str | None]:
+    if attempts and evidence:
+        return {"action": "finish", "reason": "We already have evidence.", "title": "Final answer", "answer_mode": "text"}, None
 
-    q = query.lower()
-    operation_types = {str(op.get("type", "")).strip() for op in planner.get("operations", [])}
-    source_names = [item.get("name", "") for item in source_metadata]
+    system = _role_system_prompt(agent, role) + (
+        "\n\nYou are in an investigation loop. "
+        "Choose the next best step to answer the question. "
+        "If you already have enough evidence, return action=finish. "
+        "Return JSON only."
+    )
+    user = json.dumps(
+        {
+            "question": query,
+            "plan": plan,
+            "allowed_sources": source_metadata,
+            "shared_context": shared_context,
+            "attempts_so_far": attempts,
+            "evidence_summaries": [item["summary"] for item in evidence],
+            "response_schema": ACTION_SCHEMA,
+        },
+        ensure_ascii=True,
+    )
+    action, error = _chat_json(
+        llm=llm,
+        system=system,
+        payload={
+            "question": query,
+            "plan": plan,
+            "allowed_sources": source_metadata,
+            "shared_context": shared_context,
+            "attempts_so_far": attempts,
+            "evidence_summaries": [item["summary"] for item in evidence],
+            "response_schema": ACTION_SCHEMA,
+        },
+        normalize=lambda value: _normalize_action(value, plan, source_metadata),
+        purpose="action selector",
+    )
+    if action is not None:
+        return action, None
+    return {"action": "finish", "reason": "No valid next step could be produced.", "title": "Final answer", "answer_mode": "text"}, f"Action selection failed: {error}"
 
-    if any(token in q for token in ("each dataset", "each table", "dataset summary", "what tables", "what datasets")):
-        return "dataset_summary"
-    if any(token in q for token in ("date range", "duration", "how long", "coverage", "schema", "columns", "fields")):
-        return "schema_question"
-    if agent == "ux_researcher" and ({"extract_feedback_themes", "select_representative_quotes", "count_issue_mentions"} & operation_types or any(
-        token in q for token in ("quote", "quotes", "theme", "themes", "complaint", "complaints", "feedback")
-    )):
-        return "quote_lookup"
-    if agent == "engineering_lead" and ({"build_incident_timeline", "correlate_deployments_with_metrics", "summarize_error_shift", "compare_pre_post_rollout"} & operation_types or any(
-        token in q for token in ("timeline", "incident", "deployment", "rollout", "rollback")
-    )):
-        return "incident_timeline"
-    if "aggregate_timeseries" in operation_types or any(token in q for token in ("trend", "over time", "daily", "weekly", "monthly")):
-        return "trend_analysis"
-    if "aggregate_breakdown" in operation_types or "rank_rows" in operation_types or any(token in q for token in ("compare", "break down", "split", "segment")):
-        return "comparison"
-    if "compute_funnel" in operation_types or any(token in q for token in ("root cause", "why", "cause", "explain", "funnel")):
-        return "root_cause_analysis" if any(token in q for token in ("root cause", "why", "cause", "explain")) else "investigation"
-    if any(name in q for name in source_names):
-        return "reference"
-    return "investigation"
 
-
-def _apply_deterministic_intent_plan(
-    agent: str,
-    query: str,
-    planner: dict[str, Any],
-    source_metadata: list[dict[str, Any]],
+def _execute_sql_step(
+    scenario_id: str,
+    action: dict[str, Any],
+    allowed_sql_tables: set[str],
 ) -> dict[str, Any]:
-    intent_class = _resolve_intent_class(agent, query, planner, source_metadata)
-    source_names = [item["name"] for item in source_metadata]
-    q = query.lower()
+    sql = str(action.get("sql") or "").strip()
+    result = execute_authorized_select(
+        scenario_id=scenario_id,
+        sql=sql,
+        allowed_tables=allowed_sql_tables,
+        max_rows=MAX_RESULT_ROWS,
+    )
+    if not result["ok"]:
+        return {
+            "status": "error",
+            "kind": "sql",
+            "title": action.get("title") or "SQL attempt",
+            "answer_mode": action.get("answer_mode", "table"),
+            "sql": sql,
+            "error": result["error"],
+            "sources": [f"{name}.csv" for name in result.get("referenced_tables", [])],
+            "columns": [],
+            "rows": [],
+            "truncated": False,
+        }
+    return {
+        "status": "success",
+        "kind": "sql",
+        "title": action.get("title") or "SQL result",
+        "answer_mode": action.get("answer_mode", "table"),
+        "sql": result["executed_sql"],
+        "sources": [f"{name}.csv" for name in result.get("referenced_tables", [])],
+        "columns": result["columns"],
+        "rows": result["rows"],
+        "truncated": result["truncated"],
+    }
 
-    if intent_class == "dataset_summary":
-        planner["answer_mode"] = "text"
-        planner["operations"] = [
-            {
-                "type": "summarize_source_profile",
-                "source": source_name,
-                "title": f"{source_name} profile",
-            }
-            for source_name in source_names[:6]
-        ]
-        planner["intent_class"] = intent_class
-        planner["next_steps"] = []
-        planner["pending_follow_up"] = None
-        return planner
 
-    if intent_class == "schema_question":
-        explicit_source = next((name for name in source_names if name in q), None)
-        target_source = explicit_source or (source_names[0] if source_names else "")
-        operation_type = "summarize_date_span" if any(token in q for token in ("date range", "duration", "how long", "coverage", "span")) else "summarize_source_profile"
-        planner["answer_mode"] = "text"
-        planner["operations"] = [{
-            "type": operation_type,
-            "source": target_source,
-            "title": f"{target_source} reference",
-        }]
-        planner["intent_class"] = intent_class
-        planner["next_steps"] = []
-        planner["pending_follow_up"] = None
-        return planner
-
-    planner["intent_class"] = intent_class
-    return planner
+def _execute_document_step(
+    scenario_id: str,
+    action: dict[str, Any],
+    allowed_sources: list[str],
+    query: str,
+) -> dict[str, Any]:
+    source = str(action.get("document") or "").strip()
+    if source not in allowed_sources or not source.endswith(".md"):
+        return {
+            "status": "error",
+            "kind": "document",
+            "title": action.get("title") or "Document lookup",
+            "answer_mode": "table",
+            "error": f"Unauthorized or invalid document access: {source or 'unknown'}",
+            "sources": [source] if source else [],
+            "columns": [],
+            "rows": [],
+            "truncated": False,
+        }
+    content = get_document(scenario_id, source)
+    if content is None:
+        return {
+            "status": "error",
+            "kind": "document",
+            "title": action.get("title") or "Document lookup",
+            "answer_mode": "table",
+            "error": f"Document not found: {source}",
+            "sources": [source],
+            "columns": [],
+            "rows": [],
+            "truncated": False,
+        }
+    rows = _document_rows(content, action.get("document_terms") or [], query)
+    return {
+        "status": "success",
+        "kind": "document",
+        "title": action.get("title") or source,
+        "answer_mode": "table",
+        "sql": None,
+        "sources": [source],
+        "columns": ["term", "excerpt"],
+        "rows": rows,
+        "truncated": len(rows) >= MAX_RESULT_ROWS,
+    }
 
 
 def _synthesize_response(
     llm: LLMClient,
     agent: str,
+    role: dict[str, Any],
     query: str,
-    planner: dict[str, Any],
-    intent_class: str,
-    citations: list[dict[str, Any]],
-    warnings: list[str],
-    artifacts: list[dict[str, Any]],
+    plan: dict[str, Any],
     evidence: list[dict[str, Any]],
-    next_steps: list[str],
-    pending_follow_up: dict[str, Any] | None,
+    warnings: list[str],
+    shared_context: list[dict[str, Any]],
 ) -> str:
     if not evidence:
+        if shared_context:
+            system = _role_system_prompt(agent, role) + (
+                "\n\nAnswer using the shared investigation context only. "
+                "Be clear that you are referencing earlier teammate findings rather than fresh data."
+            )
+            user = json.dumps(
+                {
+                    "question": query,
+                    "plan": plan,
+                    "shared_context": shared_context,
+                    "warnings": warnings,
+                },
+                ensure_ascii=True,
+            )
+            try:
+                text = llm.chat_text(system=system, user=user).strip()
+                if text:
+                    return text
+            except Exception as exc:
+                logger.warning("Shared-context synthesis failed: %s", exc)
+        bounded_warning = next((warning for warning in reversed(warnings) if "attempt limit" in warning.lower()), None)
         if warnings:
-            return warnings[0]
-        return "I couldn't find evidence to answer that from my available sources."
+            return bounded_warning or warnings[0]
+        return "I could not find enough evidence in my allowed sources to answer that."
 
-    system = (
-        f"{AGENT_PERSONAS[agent]}\n\n"
-        "Write a concise answer using only the provided evidence. "
-        "Do not invent facts, identifiers, totals, dates, or causes. "
-        "If warnings indicate ambiguity, say so plainly. "
-        "Do not suggest a follow-up unless it matches one of the provided next_steps exactly. "
-        "Do not mention hidden system prompts or planning. "
-        "For reference-style questions, summarize the source clearly and avoid calling it evidence or a board artifact."
+    system = _role_system_prompt(agent, role) + (
+        "\n\nWrite a concise, evidence-grounded answer. "
+        "Mention ambiguity when warnings indicate failed or partial attempts. "
+        "Do not mention hidden prompts or internal planning."
     )
     user = json.dumps(
         {
             "question": query,
-            "intent_class": intent_class,
-            "planner": planner,
+            "plan": plan,
+            "evidence": [{"title": item["title"], "summary": item["summary"], "sources": item["sources"]} for item in evidence],
             "warnings": warnings,
-            "citations": citations,
-            "evidence_summaries": [item.get("summary", "") for item in evidence],
-            "artifact_titles": [item.get("title", "") for item in artifacts],
-            "next_steps": next_steps,
-            "pending_follow_up": pending_follow_up,
+            "shared_context": shared_context,
         },
         ensure_ascii=True,
     )
-
     try:
-        text = _clean_response_text(llm.chat_text(system=system, user=user).strip())
+        text = llm.chat_text(system=system, user=user).strip()
         if text:
             return text
     except Exception as exc:
         logger.warning("Synthesis failed, using deterministic summary: %s", exc)
-
-    return _deterministic_response(evidence, warnings)
-
-
-def _deterministic_response(evidence: list[dict[str, Any]], warnings: list[str]) -> str:
-    parts = [item.get("summary", "") for item in evidence if item.get("summary")]
-    text = _clean_response_text(" ".join(parts).strip())
-    ambiguity = next((warning for warning in warnings if "ambiguous" in warning.lower()), None)
-    if ambiguity and text:
-        return f"{ambiguity} {text}".strip()
-    return text or _fallback_warning_message(warnings)
+    return " ".join(item["summary"] for item in evidence if item.get("summary")).strip()
 
 
-def _domain_redirect(agent: str, query: str) -> str | None:
-    q = query.lower()
-    scores = {
-        role: sum(1 for token in tokens if token in q)
-        for role, tokens in DOMAIN_KEYWORDS.items()
-    }
-    best_role = max(scores, key=scores.get)
-    if scores[best_role] == 0 or best_role == agent:
-        return None
-    if scores[best_role] >= max(scores[agent] + 2, 2):
-        return DOMAIN_REDIRECTS[best_role]
-    return None
+def _role_system_prompt(agent: str, role: dict[str, Any]) -> str:
+    role_name = role.get("role_name", agent.replace("_", " ").title())
+    persona = role.get("persona") or ""
+    tables = ", ".join(role.get("allowed_tables", []))
+    skills = ", ".join(role.get("skills", []))
+    return (
+        f"You are {role_name} for ZaikaNow.\n"
+        f"Persona: {persona}\n"
+        f"Allowed sources: {tables}\n"
+        f"Core skills: {skills}\n"
+        "You can make a brief plan before querying. "
+        "If a query fails, is empty, or only partially answers the question, revise your approach and try again. "
+        "Stay within evidence from your allowed sources only."
+    )
 
 
-def _default_next_steps(agent: str, query: str) -> list[str]:
-    if agent == "analyst":
-        return [
-            "Ask for a platform or payment-method split if you want to narrow the pattern.",
-            "Ask Engineering whether any deployments line up with the same time period.",
-        ]
-    if agent == "ux_researcher":
-        return [
-            "Ask for ticket or review examples tied to the same user pain point.",
-            "Ask the analyst whether the same issue shows up in a specific segment or platform.",
-        ]
-    return [
-        "Ask for the deployment or service that changed closest to the observed metric shift.",
-        "Ask the analyst whether the business impact is isolated to a segment or platform.",
-    ]
+def _build_source_metadata(scenario_id: str, allowed_tables: list[str]) -> list[dict[str, Any]]:
+    metadata: list[dict[str, Any]] = []
+    for source in allowed_tables:
+        if source.endswith(".csv"):
+            table = source.removesuffix(".csv")
+            schema = get_table_schema(scenario_id, table)
+            metadata.append(
+                {
+                    "name": source,
+                    "type": "table",
+                    "columns": get_table_columns(scenario_id, table),
+                    "schema": schema,
+                    "row_count": get_table_row_count(scenario_id, table),
+                    "sample_rows": get_sample_rows(scenario_id, table, 3),
+                }
+            )
+        elif source.endswith(".md"):
+            preview = (get_document(scenario_id, source) or "")[:240].replace("\n", " ").strip()
+            metadata.append({"name": source, "type": "document", "preview": preview})
+    return metadata
 
 
-AFFIRMATIVE_FOLLOW_UPS = {"yes", "yeah", "yep", "sure", "ok", "okay", "do it", "please do", "go ahead"}
-NEGATIVE_FOLLOW_UPS = {"no", "nah", "nope", "not now", "skip it"}
-
-
-def _resolve_follow_up_query(agent: str, query: str, history: list[dict[str, Any]]) -> dict[str, Any]:
-    normalized = " ".join(query.lower().split())
-    last_turn = _last_same_agent_history_item(history, agent)
-    if not last_turn:
-        return {"effective_query": query, "note": None, "handled_response": None, "pending_follow_up": None}
-
-    planner = last_turn.get("planner") or {}
-    pending_follow_up = _normalize_pending_follow_up(planner.get("pending_follow_up"))
-    if pending_follow_up:
-        if normalized in NEGATIVE_FOLLOW_UPS:
-            return {
-                "effective_query": query,
-                "note": "The previous follow-up thread was dismissed by the user.",
-                "handled_response": "Understood. We can drop that thread and move on.",
-                "pending_follow_up": None,
+def _build_shared_context(history: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    context: list[dict[str, Any]] = []
+    for item in history[-MAX_HISTORY_ITEMS:]:
+        context.append(
+            {
+                "agent": item.get("agent"),
+                "question": item.get("query"),
+                "answer_summary": _clip(str(item.get("response") or ""), 220),
+                "artifact_titles": [artifact.get("title") for artifact in (item.get("artifacts") or [])[:2]],
+                "citations": [citation.get("title") or citation.get("source") for citation in (item.get("citations") or [])[:2]],
             }
-        if normalized in AFFIRMATIVE_FOLLOW_UPS:
-            default_choice = pending_follow_up["default_choice"]
-            return {
-                "effective_query": pending_follow_up["resolved_query_template"].format(choice=default_choice),
-                "note": "Interpreted a short affirmative reply using the previous turn's pending follow-up.",
-                "handled_response": None,
-                "pending_follow_up": None,
-            }
-
-        matched_choice = _match_follow_up_choice(query, pending_follow_up["choices"])
-        if matched_choice:
-            return {
-                "effective_query": pending_follow_up["resolved_query_template"].format(choice=matched_choice),
-                "note": "Resolved the reply against the previous turn's pending follow-up choices.",
-                "handled_response": None,
-                "pending_follow_up": None,
-            }
-
-        if len(normalized.split()) <= 3:
-            choices = "; ".join(pending_follow_up["choices"])
-            return {
-                "effective_query": query,
-                "note": "The short reply did not match any pending follow-up choice.",
-                "handled_response": f"I can continue that thread, but I need you to choose one of these: {choices}",
-                "pending_follow_up": pending_follow_up,
-            }
-
-        return {"effective_query": query, "note": None, "handled_response": None, "pending_follow_up": pending_follow_up}
-
-    if normalized not in AFFIRMATIVE_FOLLOW_UPS:
-        return {"effective_query": query, "note": None, "handled_response": None, "pending_follow_up": None}
-
-    artifacts = last_turn.get("artifacts") or []
-    fallback_query = _heuristic_follow_up_from_artifacts(last_turn.get("query", ""), artifacts)
-    if fallback_query:
-        return {
-            "effective_query": fallback_query,
-            "note": "Interpreted a short affirmative reply using the previous turn's artifacts.",
-            "handled_response": None,
-            "pending_follow_up": None,
-        }
-
-    return {"effective_query": query, "note": None, "handled_response": None, "pending_follow_up": None}
-
-
-def _heuristic_follow_up_from_artifacts(previous_query: str, artifacts: list[dict[str, Any]]) -> str | None:
-    lowered_query = previous_query.lower()
-    for artifact in artifacts:
-        if artifact.get("kind") != "chart":
-            continue
-        if artifact.get("chart_type") == "line" and "trend" in lowered_query:
-            return "Break down the previous trend by platform."
-        if artifact.get("chart_type") == "bar":
-            return "Show the top contributors behind the previous breakdown."
-        if artifact.get("chart_type") == "funnel":
-            return "Break down the funnel by platform."
-    return None
-
-
-def _last_same_agent_history_item(history: list[dict[str, Any]], agent: str) -> dict[str, Any] | None:
-    for item in reversed(history):
-        if item.get("agent") == agent:
-            return item
-    return None
+        )
+    return context
 
 
 def _last_agent_turn_context(history: list[dict[str, Any]], agent: str) -> dict[str, Any] | None:
-    last_turn = _last_same_agent_history_item(history, agent)
-    if not last_turn:
-        return None
-    planner = last_turn.get("planner") or {}
-    artifacts = last_turn.get("artifacts") or []
-    return {
-        "query": last_turn.get("query"),
-        "response": last_turn.get("response"),
-        "next_steps": planner.get("next_steps") or [],
-        "effective_query": planner.get("effective_query"),
-        "pending_follow_up": planner.get("pending_follow_up"),
-        "artifact_titles": [artifact.get("title") for artifact in artifacts[:3]],
-    }
-
-
-def _source_columns(source_metadata: list[dict[str, Any]], source_name: str) -> list[str]:
-    for source in source_metadata:
-        if source["name"] == source_name:
-            return source.get("columns", [])
-    return []
-
-
-def _normalize_pending_follow_up(value: Any) -> dict[str, Any] | None:
-    if not isinstance(value, dict):
-        return None
-    prompt = str(value.get("prompt") or "").strip()
-    raw_choices = value.get("choices") or []
-    choices = [str(choice).strip() for choice in raw_choices if str(choice).strip()]
-    if not prompt or not choices:
-        return None
-    default_choice = str(value.get("default_choice") or choices[0]).strip()
-    if default_choice not in choices:
-        default_choice = choices[0]
-    resolved_query_template = str(value.get("resolved_query_template") or "{choice}").strip()
-    return {
-        "prompt": prompt,
-        "choices": choices,
-        "default_choice": default_choice,
-        "resolved_query_template": resolved_query_template,
-    }
-
-
-def _resolve_pending_follow_up(
-    planner: dict[str, Any],
-    query: str,
-    artifacts: list[dict[str, Any]],
-) -> dict[str, Any] | None:
-    pending = _normalize_pending_follow_up(planner.get("pending_follow_up"))
-    if pending:
-        return pending
-    lowered = query.lower()
-    if any(artifact.get("kind") == "chart" and artifact.get("chart_type") == "line" for artifact in artifacts):
-        return {
-            "prompt": "Would you like to break down this trend further?",
-            "choices": [
-                "Break down the previous trend by platform.",
-                "Break down the previous trend by order status.",
-                "Show the previous trend aggregated monthly.",
-            ],
-            "default_choice": "Break down the previous trend by platform.",
-            "resolved_query_template": "{choice}",
-        }
-    if any(artifact.get("kind") == "chart" and artifact.get("chart_type") == "funnel" for artifact in artifacts):
-        return {
-            "prompt": "Would you like to break down the funnel further?",
-            "choices": [
-                "Break down the funnel by platform.",
-                "Break down the funnel by app version.",
-            ],
-            "default_choice": "Break down the funnel by platform.",
-            "resolved_query_template": "{choice}",
-        }
-    if any(artifact.get("kind") == "chart" and artifact.get("chart_type") == "bar" for artifact in artifacts) or "break down" in lowered:
-        return {
-            "prompt": "Would you like to continue this breakdown?",
-            "choices": [
-                "Show the same breakdown over time.",
-                "Rank the strongest and weakest segments in the previous breakdown.",
-            ],
-            "default_choice": "Show the same breakdown over time.",
-            "resolved_query_template": "{choice}",
-        }
+    for item in reversed(history):
+        if item.get("agent") == agent:
+            return {
+                "query": item.get("query"),
+                "response": item.get("response"),
+                "artifact_titles": [artifact.get("title") for artifact in (item.get("artifacts") or [])[:3]],
+            }
     return None
 
 
-def _match_follow_up_choice(query: str, choices: list[str]) -> str | None:
-    normalized_query = _normalize_choice_text(query)
-    if not normalized_query:
-        return None
-    for choice in choices:
-        normalized_choice = _normalize_choice_text(choice)
-        if normalized_query == normalized_choice or normalized_query in normalized_choice:
-            return choice
-    return None
+def _normalize_plan(plan: dict[str, Any], source_metadata: list[dict[str, Any]]) -> dict[str, Any]:
+    allowed_sources = {item["name"] for item in source_metadata}
+    raw_target_tables = plan.get("target_tables") or []
+    raw_sub_questions = plan.get("sub_questions") or []
+    raw_next_steps = plan.get("next_steps") or []
+    complexity = str(plan.get("complexity") or "single_query").strip().lower()
+    if complexity not in {"single_query", "multi_step"}:
+        complexity = "single_query"
+    target_tables = [
+        source for source in raw_target_tables if isinstance(source, str) and source in allowed_sources
+    ]
+    if not target_tables and source_metadata:
+        target_tables = [source_metadata[0]["name"]]
+    next_steps = [str(step).strip() for step in raw_next_steps if str(step).strip()][:3]
+    return {
+        "question_understanding": str(plan.get("question_understanding") or "").strip() or "Answer the user's question from allowed sources.",
+        "complexity": complexity,
+        "sub_questions": [str(item).strip() for item in raw_sub_questions if str(item).strip()][:4],
+        "target_tables": target_tables,
+        "stop_condition": str(plan.get("stop_condition") or "").strip() or "Stop when the answer is supported by query results.",
+        "next_steps": next_steps,
+    }
 
 
-def _normalize_choice_text(value: str) -> str:
-    return " ".join(value.lower().replace(".", "").split())
+def _normalize_action(action: dict[str, Any], plan: dict[str, Any], source_metadata: list[dict[str, Any]]) -> dict[str, Any]:
+    allowed_sources = {item["name"] for item in source_metadata}
+    raw_document_terms = action.get("document_terms") or []
+    action_type = str(action.get("action") or "sql").strip().lower()
+    if action_type not in {"sql", "document", "finish"}:
+        action_type = "sql"
+    answer_mode = str(action.get("answer_mode") or "table").strip().lower()
+    if answer_mode not in {"metric", "chart", "table", "text"}:
+        answer_mode = "table"
+    document = str(action.get("document") or "").strip()
+    if document and document not in allowed_sources:
+        document = ""
+    return {
+        "action": action_type,
+        "reason": str(action.get("reason") or "").strip(),
+        "sql": str(action.get("sql") or "").strip(),
+        "document": document,
+        "document_terms": [str(term).strip() for term in raw_document_terms if str(term).strip()][:3],
+        "title": str(action.get("title") or "").strip() or "Investigation result",
+        "answer_mode": answer_mode,
+        "target_tables": plan.get("target_tables", []),
+    }
 
 
-def _clean_response_text(text: str) -> str:
-    cleaned = text.replace("**", "").replace("*", "")
-    cleaned = cleaned.replace("`", "")
-    cleaned = cleaned.replace("\r", "")
-    for prefix in (
-        "Based on the provided evidence, ",
-        "Based on the evidence provided, ",
-        "Based on the evidence, ",
-    ):
-        if cleaned.startswith(prefix):
-            cleaned = cleaned[len(prefix):]
-    cleaned = "\n".join(line.strip() for line in cleaned.splitlines())
-    cleaned = "\n".join(line for line in cleaned.splitlines() if line and line != "(Chart)")
-    return cleaned.strip()
+def _generic_plan(source_metadata: list[dict[str, Any]]) -> dict[str, Any]:
+    return {
+        "question_understanding": "Investigate the question using allowed sources and revise based on query results.",
+        "complexity": "multi_step",
+        "sub_questions": [],
+        "target_tables": [item["name"] for item in source_metadata],
+        "stop_condition": "Stop when the answer is supported by successful query results.",
+        "next_steps": [],
+    }
 
 
-def _fallback_warning_message(warnings: list[str]) -> str:
-    for warning in warnings:
-        if "Interpreted a short affirmative reply" in warning:
+def _build_artifacts_and_citations(evidence: list[dict[str, Any]], agent: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    artifacts: list[dict[str, Any]] = []
+    citations: list[dict[str, Any]] = []
+    for item in evidence:
+        citation = {
+            "citation_id": item["evidence_id"],
+            "source": ", ".join(item.get("sources", [])),
+            "title": item["title"],
+            "summary": item["summary"],
+        }
+        citations.append(citation)
+        artifacts.append(_artifact_from_evidence(item, citation["citation_id"], agent))
+    return artifacts, citations
+
+
+def _artifact_from_evidence(item: dict[str, Any], citation_id: str, agent: str) -> dict[str, Any]:
+    rows = item.get("rows", [])
+    columns = item.get("columns", [])
+    answer_mode = item.get("answer_mode", "table")
+    numeric_columns = [col for col in columns if _column_is_numeric(rows, col)]
+    if rows and answer_mode == "metric" and len(rows) == 1 and numeric_columns:
+        value_col = numeric_columns[0]
+        return {
+            "kind": "metric",
+            "title": item["title"],
+            "value": rows[0].get(value_col),
+            "subtitle": item["summary"],
+            "citation_ids": [citation_id],
+            "purpose": "supporting_evidence",
+            "display_mode": "board_default",
+            "source_role": agent,
+            "confidence": "medium",
+            "card_variant": "metric",
+            "summary": item["summary"],
+        }
+    if rows and len(columns) >= 2 and len(rows) <= 12 and numeric_columns:
+        label_column = next((col for col in columns if col not in numeric_columns), columns[0])
+        value_column = next((col for col in numeric_columns if col != label_column), numeric_columns[0])
+        chart_type = "line" if _looks_like_time_column(rows, label_column) else "bar"
+        return {
+            "kind": "chart",
+            "title": item["title"],
+            "chart_type": chart_type,
+            "labels": [str(row.get(label_column, "")) for row in rows],
+            "series": [{"name": value_column, "values": [float(row.get(value_column, 0) or 0) for row in rows]}],
+            "citation_ids": [citation_id],
+            "purpose": "supporting_evidence",
+            "display_mode": "board_default",
+            "source_role": agent,
+            "confidence": "medium",
+            "card_variant": "chart",
+            "summary": item["summary"],
+        }
+    return {
+        "kind": "table",
+        "title": item["title"],
+        "columns": columns,
+        "rows": rows,
+        "citation_ids": [citation_id],
+        "purpose": "supporting_evidence",
+        "display_mode": "board_default",
+        "source_role": agent,
+        "confidence": "medium",
+        "card_variant": "table",
+        "summary": item["summary"],
+    }
+
+
+def _default_next_steps(role: dict[str, Any]) -> list[str]:
+    skills = role.get("skills", [])
+    if len(skills) >= 2:
+        return [f"Ask for a deeper cut on {skills[0].lower()}.", f"Ask for a follow-up using {skills[1].lower()}."]
+    return ["Ask a follow-up question to narrow the evidence."]
+
+
+def _document_rows(content: str, terms: list[str], query: str) -> list[dict[str, str]]:
+    search_terms = [str(term).strip() for term in terms if str(term).strip()]
+    rows: list[dict[str, str]] = []
+    lowered = content.lower()
+    for term in search_terms[:3]:
+        idx = lowered.find(term.lower())
+        if idx == -1:
             continue
-        if "Planner fallback used" in warning:
+        start = max(0, idx - 120)
+        end = min(len(content), idx + 240)
+        rows.append({"term": term, "excerpt": content[start:end].replace("\n", " ").strip()})
+    if not rows:
+        rows.append({"term": "preview", "excerpt": content[:280].replace("\n", " ").strip()})
+    return rows[:MAX_RESULT_ROWS]
+
+
+def _summarize_attempt(record: dict[str, Any]) -> str:
+    rows = record.get("rows", [])
+    sources = ", ".join(record.get("sources", []))
+    title = record.get("title") or "Result"
+    if record.get("kind") == "document":
+        return f"{title} surfaced {len(rows)} excerpt(s) from {sources}."
+    if len(rows) == 1:
+        preview = ", ".join(f"{key}={value}" for key, value in list(rows[0].items())[:3])
+        return f"{title} returned 1 row from {sources}: {preview}."
+    return f"{title} returned {len(rows)} rows from {sources}."
+
+
+def _looks_like_time_column(rows: list[dict[str, Any]], column: str) -> bool:
+    values = [str(row.get(column, "")) for row in rows[:3]]
+    return all(any(char.isdigit() for char in value) and ("-" in value or ":" in value) for value in values if value)
+
+
+def _column_is_numeric(rows: list[dict[str, Any]], column: str) -> bool:
+    if not rows:
+        return False
+    seen = False
+    for row in rows[:5]:
+        value = row.get(column)
+        if value is None or value == "":
             continue
-        if "pending follow-up" in warning:
+        seen = True
+        if not isinstance(value, (int, float)):
+            return False
+    return seen
+
+
+def _clip(text: str, limit: int) -> str:
+    if len(text) <= limit:
+        return text
+    return text[: limit - 1].rstrip() + "…"
+
+
+def _unique_preserve(items: list[str]) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for item in items:
+        if not item or item in seen:
             continue
-        return warning
-    return "I gathered evidence, but I couldn't form a clean summary."
+        seen.add(item)
+        result.append(item)
+    return result
+
+
+def _chat_json(
+    llm: LLMClient,
+    system: str,
+    payload: dict[str, Any],
+    normalize: Any,
+    purpose: str,
+) -> tuple[dict[str, Any] | None, str | None]:
+    latest_error: str | None = None
+    current_payload = dict(payload)
+    for attempt in range(2):
+        try:
+            value = llm.chat(system=system, user=json.dumps(current_payload, ensure_ascii=True))
+            if not isinstance(value, dict):
+                raise ValueError(f"{purpose} did not return a JSON object.")
+            return normalize(value), None
+        except Exception as exc:
+            latest_error = str(exc)
+            logger.warning("%s attempt %s failed: %s", purpose.title(), attempt + 1, exc)
+            current_payload = {
+                **payload,
+                "previous_error": latest_error,
+                "instruction": "Return a valid JSON object that matches the response schema.",
+            }
+    return None, latest_error

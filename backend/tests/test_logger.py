@@ -102,3 +102,27 @@ def test_saved_evidence_and_session_events_are_persisted(tmp_path, monkeypatch):
         "artifact_removed",
     ]
     assert [event["sequence_number"] for event in events] == [1, 2, 3, 4]
+
+
+def test_clear_all_session_data_removes_previous_sessions(tmp_path, monkeypatch):
+    test_db = tmp_path / "simwork-test.db"
+    monkeypatch.setattr(logger, "DB_PATH", test_db)
+
+    logger.init_db()
+    logger.create_session("session_one", "candidate_1", "checkout_conversion_drop")
+    logger.log_query(
+        session_id="session_one",
+        agent="analyst",
+        query_text="Show daily order trends",
+        response_text="Orders declined over time.",
+        artifacts=[],
+        citations=[],
+        warnings=[],
+        planner={},
+    )
+
+    logger.clear_all_session_data()
+
+    assert logger.get_session("session_one") is None
+    assert logger.get_query_history("session_one") == []
+    assert logger.get_session_events("session_one") == []

@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.routes import router
-from investigation_logger.logger import init_db
+from investigation_logger.logger import clear_all_session_data, init_db
 
 app = FastAPI(
     title="SimWork API",
@@ -32,6 +32,7 @@ app.include_router(router)
 @app.on_event("startup")
 def on_startup():
     init_db()
+    clear_all_session_data()
 
 
 @app.get("/health")

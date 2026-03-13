@@ -63,6 +63,17 @@ def get_agent_capability_profile(scenario_id: str, agent: str) -> dict[str, Any]
     return profile
 
 
+def get_agent_role_config(scenario_id: str, agent: str) -> dict[str, Any]:
+    """Return merged role config with persona, skills, and allowed sources."""
+    profile = get_agent_capability_profile(scenario_id, agent)
+    access = get_agent_data_access(scenario_id, agent)
+    return {
+        **profile,
+        "allowed_tables": access.get("tables", []),
+        "access_description": access.get("description", ""),
+    }
+
+
 def get_agent_capability_profiles(scenario_id: str) -> dict[str, Any]:
     """Return all scenario-backed capability profiles."""
     scenario = load_scenario(scenario_id)
@@ -93,4 +104,3 @@ def load_tables(scenario_id: str, allowed_files: list[str]) -> dict[str, Any]:
             if content is not None:
                 data[filename] = content
     return data
-

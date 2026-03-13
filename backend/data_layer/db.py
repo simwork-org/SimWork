@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -36,6 +37,19 @@ def query(scenario_id: str, sql: str, params: tuple | list = ()) -> list[dict[st
     cursor = conn.execute(sql, params)
     columns = [desc[0] for desc in cursor.description] if cursor.description else []
     return [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+
+def query_with_columns(
+    scenario_id: str,
+    sql: str,
+    params: tuple | list = (),
+) -> tuple[list[str], list[dict[str, Any]]]:
+    """Execute a SQL query and return columns with rows."""
+    conn = get_connection(scenario_id)
+    cursor = conn.execute(sql, params)
+    columns = [desc[0] for desc in cursor.description] if cursor.description else []
+    rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
+    return columns, rows
 
 
 def query_value(scenario_id: str, sql: str, params: tuple | list = ()) -> Any:
@@ -150,3 +164,124 @@ def build_where_clause(
     if not clauses:
         return "", []
     return "WHERE " + " AND ".join(clauses), params
+
+
+READ_ONLY_SQL_PREFIXES = ("select", "with")
+FORBIDDEN_SQL_TOKENS = (
+    "insert",
+    "update",
+    "delete",
+    "drop",
+    "alter",
+    "create",
+    "replace",
+    "attach",
+    "detach",
+    "pragma",
+    "vacuum",
+)
+
+
+def extract_referenced_tables(sql: str) -> set[str]:
+    """Extract likely table names from FROM/JOIN clauses."""
+    cleaned = re.sub(r"--.*?$|/\*.*?\*/", " ", sql, flags=re.MULTILINE | re.DOTALL)
+    refs = set()
+    for match in re.finditer(r"\b(?:from|join)\s+([^\s,()]+)", cleaned, flags=re.IGNORECASE):
+        token = match.group(1).strip()
+        token = token.strip("[]\"`;")
+        if token.lower().endswith(".csv"):
+            token = token[:-4]
+        elif "." in token:
+            token = token.split(".")[-1]
+        lowered = token.lower()
+        if lowered in {"select"}:
+            continue
+        refs.add(token)
+    return refs
+
+
+def validate_select_sql(sql: str, allowed_tables: set[str]) -> tuple[bool, str | None, set[str]]:
+    """Validate that SQL is read-only and references only allowed tables."""
+    stripped = sql.strip()
+    lowered = stripped.lower()
+    if not stripped:
+        return False, "Query is empty.", set()
+    if not lowered.startswith(READ_ONLY_SQL_PREFIXES):
+        return False, "Only read-only SELECT queries are allowed.", set()
+    if ";" in stripped.rstrip(";"):
+        return False, "Only a single SQL statement is allowed.", set()
+    tokenized = re.findall(r"\b[a-z_]+\b", lowered)
+    for token in FORBIDDEN_SQL_TOKENS:
+        if token in tokenized:
+            return False, f"Forbidden SQL keyword detected: {token}.", set()
+
+    referenced = extract_referenced_tables(stripped)
+    unauthorized = {table for table in referenced if table not in allowed_tables}
+    if unauthorized:
+        return False, f"Unauthorized table access: {', '.join(sorted(unauthorized))}.", referenced
+    return True, None, referenced
+
+
+def ensure_limit(sql: str, max_rows: int) -> str:
+    """Append a LIMIT when the query does not already specify one."""
+    stripped = sql.strip().rstrip(";").rstrip()
+    if re.search(r"\blimit\s+\d+\b", stripped, flags=re.IGNORECASE):
+        return stripped
+    return f"{stripped} LIMIT {max_rows}"
+
+
+def normalize_sql_table_references(sql: str) -> str:
+    """Rewrite `.csv` table references to their SQLite table names."""
+    normalized = re.sub(r"\[([A-Za-z0-9_]+)\.csv\]", r"[\1]", sql)
+    normalized = re.sub(r'(?<![\w"])([A-Za-z0-9_]+)\.csv(?![\w"])', r"\1", normalized)
+    return normalized
+
+
+def execute_authorized_select(
+    scenario_id: str,
+    sql: str,
+    allowed_tables: set[str],
+    max_rows: int = 50,
+) -> dict[str, Any]:
+    """Validate and execute a read-only query within the caller's table scope."""
+    valid, error, referenced_tables = validate_select_sql(sql, allowed_tables)
+    if not valid:
+        return {
+            "ok": False,
+            "error": error,
+            "columns": [],
+            "rows": [],
+            "row_count": 0,
+            "referenced_tables": sorted(referenced_tables),
+            "truncated": False,
+            "executed_sql": sql,
+        }
+
+    normalized_sql = normalize_sql_table_references(sql)
+    limited_sql = ensure_limit(normalized_sql, max_rows + 1)
+    try:
+        columns, rows = query_with_columns(scenario_id, limited_sql)
+    except sqlite3.Error as exc:
+        return {
+            "ok": False,
+            "error": str(exc),
+            "columns": [],
+            "rows": [],
+            "row_count": 0,
+            "referenced_tables": sorted(referenced_tables),
+            "truncated": False,
+            "executed_sql": limited_sql,
+        }
+
+    truncated = len(rows) > max_rows
+    visible_rows = rows[:max_rows]
+    return {
+        "ok": True,
+        "error": None,
+        "columns": columns,
+        "rows": visible_rows,
+        "row_count": len(visible_rows),
+        "referenced_tables": sorted(referenced_tables),
+        "truncated": truncated,
+        "executed_sql": limited_sql,
+    }

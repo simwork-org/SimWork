@@ -8,6 +8,7 @@ from typing import Any
 
 from agent_router.router import route_query, validate_agent
 from investigation_logger.logger import (
+    clear_all_session_data,
     create_session,
     get_queries_count,
     get_query_history,
@@ -50,6 +51,7 @@ def _get_llm() -> LLMClient:
 def start_session(candidate_id: str, scenario_id: str) -> dict[str, Any]:
     scenario = load_scenario(scenario_id)
     session_id = f"session_{uuid.uuid4().hex[:12]}"
+    clear_all_session_data()
     create_session(session_id, candidate_id, scenario_id)
     return {
         "session_id": session_id,
@@ -89,9 +91,10 @@ def handle_query(session_id: str, agent: str, query: str, input_mode: str = "typ
         scenario_id=session["scenario_id"],
         agent=agent,
         query=query,
-        conversation_history=history[-10:] if history else None,
+        conversation_history=history[-20:] if history else None,
     )
     planner = result.pop("_planner", None)
+    attempts = result.pop("_attempts", None)
     query_log_id = log_query(
         session_id,
         agent,
@@ -101,6 +104,7 @@ def handle_query(session_id: str, agent: str, query: str, input_mode: str = "typ
         citations=result.get("citations"),
         warnings=result.get("warnings"),
         planner=planner,
+        attempts=attempts,
     )
     log_session_event(
         session_id,
