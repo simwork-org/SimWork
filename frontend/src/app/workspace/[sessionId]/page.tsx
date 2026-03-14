@@ -289,6 +289,25 @@ function BarChart({ artifact }: { artifact: Extract<Artifact, { kind: "chart" }>
   );
 }
 
+function formatChartAxisValue(value: number, unit?: string) {
+  if (Math.abs(value) >= 1000) {
+    return `${(value / 1000).toFixed(value >= 10000 ? 0 : 1)}k${unit === "%" ? "%" : ""}`;
+  }
+  if (unit === "%") return `${Math.round(value)}%`;
+  if (Number.isInteger(value)) return value.toLocaleString();
+  return value.toFixed(1);
+}
+
+function getLabelTickIndices(total: number, maxTicks = 6) {
+  if (total <= maxTicks) return Array.from({ length: total }, (_, index) => index);
+  const step = Math.ceil((total - 1) / (maxTicks - 1));
+  const indices = new Set<number>([0, total - 1]);
+  for (let index = step; index < total - 1; index += step) {
+    indices.add(index);
+  }
+  return Array.from(indices).sort((left, right) => left - right).slice(0, maxTicks);
+}
+
 function LineChart({ artifact }: { artifact: Extract<Artifact, { kind: "chart" }> }) {
   if (artifact.labels.length < 2) return <BarChart artifact={artifact} />;
   const palette = ["#10B981", "#38BDF8", "#F59E0B", "#A855F7"];
@@ -296,18 +315,55 @@ function LineChart({ artifact }: { artifact: Extract<Artifact, { kind: "chart" }
   const max = Math.max(...flattened, 1);
   const min = Math.min(...flattened, 0);
   const range = max - min || 1;
-  const width = 320;
-  const height = 120;
-  const padX = 14;
-  const padY = 18;
+  const width = 360;
+  const height = 180;
+  const padLeft = 42;
+  const padRight = 12;
+  const padTop = 12;
+  const padBottom = 34;
+  const plotWidth = width - padLeft - padRight;
+  const plotHeight = height - padTop - padBottom;
+  const yTicks = Array.from({ length: 5 }, (_, index) => min + ((4 - index) / 4) * range);
+  const labelTickIndices = getLabelTickIndices(artifact.labels.length);
 
   return (
     <div className="space-y-3">
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full" style={{ aspectRatio: `${width}/${height}` }}>
+        {yTicks.map((tickValue, index) => {
+          const y = padTop + (1 - (tickValue - min) / range) * plotHeight;
+          return (
+            <g key={`y-tick-${index}`}>
+              <line
+                x1={padLeft}
+                x2={width - padRight}
+                y1={y}
+                y2={y}
+                stroke="currentColor"
+                className="text-slate-800/10 dark:text-white/10"
+              />
+              <text
+                x={padLeft - 6}
+                y={y + 4}
+                textAnchor="end"
+                className="fill-slate-500 text-[10px]"
+              >
+                {formatChartAxisValue(tickValue, artifact.unit)}
+              </text>
+            </g>
+          );
+        })}
+        <line
+          x1={padLeft}
+          x2={width - padRight}
+          y1={height - padBottom}
+          y2={height - padBottom}
+          stroke="currentColor"
+          className="text-slate-800/20 dark:text-white/10"
+        />
         {artifact.series.map((series, seriesIndex) => {
           const points = series.values.map((value, index) => {
-            const x = padX + (index / Math.max(artifact.labels.length - 1, 1)) * (width - padX * 2);
-            const y = padY + (1 - (value - min) / range) * (height - padY * 2);
+            const x = padLeft + (index / Math.max(artifact.labels.length - 1, 1)) * plotWidth;
+            const y = padTop + (1 - (value - min) / range) * plotHeight;
             return `${x},${y}`;
           });
           return (
@@ -322,14 +378,30 @@ function LineChart({ artifact }: { artifact: Extract<Artifact, { kind: "chart" }
             />
           );
         })}
+        {labelTickIndices.map((index) => {
+          const x = padLeft + (index / Math.max(artifact.labels.length - 1, 1)) * plotWidth;
+          return (
+            <g key={`x-tick-${index}`}>
+              <line
+                x1={x}
+                x2={x}
+                y1={height - padBottom}
+                y2={height - padBottom + 4}
+                stroke="currentColor"
+                className="text-slate-800/20 dark:text-white/10"
+              />
+              <text
+                x={x}
+                y={height - 10}
+                textAnchor="middle"
+                className="fill-slate-500 text-[10px]"
+              >
+                {artifact.labels[index]}
+              </text>
+            </g>
+          );
+        })}
       </svg>
-      <div className="flex justify-between gap-2 overflow-x-auto">
-        {artifact.labels.map((label, index) => (
-          <div key={`${label}-${index}`} className="min-w-[56px] text-center">
-            <p className="text-[10px] text-slate-500">{label}</p>
-          </div>
-        ))}
-      </div>
       <div className="flex flex-wrap gap-3">
         {artifact.series.map((series, index) => (
           <div key={series.name} className="flex items-center gap-2 text-[11px] text-slate-500">

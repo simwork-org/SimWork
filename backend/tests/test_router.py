@@ -52,7 +52,7 @@ def test_simple_question_can_be_answered_with_single_query():
     assert result["artifacts"][0]["kind"] == "table"
     assert result["citations"][0]["source"] == "users"
     assert result["next_steps"] == ["Ask for the earliest completed order too."]
-    assert "earliest signup" in result["response"].lower()
+    assert "earliest signed up users" in result["response"].lower()
 
 
 def test_agent_retries_after_invalid_query_and_then_succeeds():
@@ -133,6 +133,44 @@ def test_agent_can_join_multiple_allowed_tables_within_role_scope():
     assert result["artifacts"][0]["kind"] == "table"
     assert "users" in result["citations"][0]["source"]
     assert "orders" in result["citations"][0]["source"]
+
+
+def test_table_answer_mode_stays_table_and_response_uses_real_rows():
+    llm = StubLLM(
+        json_responses=[
+            {
+                "question_understanding": "Show month-over-month order volume in tabular form.",
+                "complexity": "single_query",
+                "target_tables": ["orders"],
+                "stop_condition": "Once the monthly table is available.",
+                "next_steps": [],
+            },
+            {
+                "action": "sql",
+                "sql": (
+                    "SELECT strftime('%Y-%m', created_at) AS month, COUNT(order_id) AS order_count "
+                    "FROM [orders] "
+                    "GROUP BY strftime('%Y-%m', created_at) "
+                    "ORDER BY month"
+                ),
+                "title": "Monthly order volume",
+                "answer_mode": "table",
+            },
+        ],
+        text_response="WRONG SYNTHESIZED COUNTS",
+    )
+
+    result = route_query(
+        llm,
+        "checkout_conversion_drop",
+        "analyst",
+        "give month on month change in order volume in tabular form",
+    )
+
+    assert result["artifacts"][0]["kind"] == "table"
+    assert "| month | order_count |" in result["response"]
+    assert "7589" in result["response"]
+    assert "WRONG SYNTHESIZED COUNTS" not in result["response"]
 
 
 def test_agent_querying_other_roles_tables_fails_cleanly():
@@ -258,6 +296,35 @@ def test_planner_receives_distinct_user_type_values():
     planner_payload = llm.calls[0][2]
     assert '"user_type"' in planner_payload
     assert '"power"' in planner_payload
+
+
+def test_planner_receives_table_date_ranges():
+    llm = StubLLM(
+        json_responses=[
+            {
+                "question_understanding": "Show the full daily order trend.",
+                "complexity": "single_query",
+                "target_tables": ["orders"],
+                "stop_condition": "Once the full time series is available.",
+                "next_steps": [],
+            },
+            {
+                "action": "finish",
+                "reason": "This test only validates date-range metadata.",
+                "title": "Final answer",
+                "answer_mode": "text",
+            },
+        ],
+        text_response="Using the full available order date range.",
+    )
+
+    route_query(llm, "checkout_conversion_drop", "analyst", "Show daily order trends")
+
+    planner_payload = llm.calls[0][2]
+    assert '"date_ranges"' in planner_payload
+    assert '"created_at"' in planner_payload
+    assert '"2024-10-01' in planner_payload
+    assert '"2025-03-31' in planner_payload
 
 
 def test_ambiguous_question_returns_single_clarifying_question():
@@ -530,6 +597,38 @@ def test_agent_stops_asking_after_clarification_cap():
 
     assert result["pending_follow_up"] is None
     assert any("clarification limit reached" in warning.lower() for warning in result["warnings"])
+
+
+def test_chart_queries_can_return_more_than_twelve_rows():
+    llm = StubLLM(
+        json_responses=[
+            {
+                "question_understanding": "Plot the daily order trend.",
+                "complexity": "single_query",
+                "target_tables": ["orders"],
+                "stop_condition": "Once the daily order trend is available.",
+                "next_steps": [],
+            },
+            {
+                "action": "sql",
+                "sql": (
+                    "SELECT substr(created_at, 1, 10) AS order_date, COUNT(*) AS order_count "
+                    "FROM [orders] "
+                    "GROUP BY order_date "
+                    "ORDER BY order_date"
+                ),
+                "title": "Daily order trend",
+                "answer_mode": "chart",
+            },
+        ],
+        text_response="The daily order trend is shown in the attached chart.",
+    )
+
+    result = route_query(llm, "checkout_conversion_drop", "analyst", "Show me the daily order trend")
+
+    chart = result["artifacts"][0]
+    assert chart["kind"] == "chart"
+    assert len(chart["labels"]) > 12
 
 
 def test_scoped_sql_executor_rejects_unauthorized_tables():

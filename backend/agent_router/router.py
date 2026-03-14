@@ -10,6 +10,7 @@ from typing import Any
 from data_layer.db import (
     execute_authorized_select,
     get_document,
+    get_table_date_ranges,
     get_distinct_value_previews,
     get_sample_rows,
     get_table_columns,
@@ -24,7 +25,8 @@ logger = logging.getLogger(__name__)
 
 MAX_HISTORY_ITEMS = 12
 MAX_INVESTIGATION_ATTEMPTS = 4
-MAX_RESULT_ROWS = 12
+MAX_TABLE_RESULT_ROWS = 12
+MAX_CHART_RESULT_ROWS = 240
 MAX_CLARIFICATION_QUESTIONS = 3
 
 PLAN_SCHEMA = {
@@ -192,6 +194,7 @@ def _plan_investigation(
         "Decide whether the question looks solvable with one query or needs multiple steps. "
         "Use the provided table metadata, including distinct categorical values, to resolve likely filters before asking the user. "
         "If metadata is not enough, prefer a small discovery query over a clarifying question. "
+        "For trend or time-series questions, plan to use the full available date range unless the user explicitly narrows it. "
         "Ask a clarifying question only when the ambiguity materially changes the SQL plan or answer semantics. "
         "Ask one clarifying question at a time, prefer 2-3 suggested answers for common ambiguities, "
         "always allow free-text clarification, and do not ask more questions if the clarification budget is exhausted. "
@@ -323,6 +326,8 @@ def _choose_next_action(
         "\n\nYou are in an investigation loop. "
         "Choose the next best step to answer the question. "
         "If the user mentioned a segment or category that might match a low-cardinality column, check metadata or run a small discovery query before asking for clarification. "
+        "For trend or time-series questions, use answer_mode=chart and query the full available date range unless the user explicitly asks for a narrower window. "
+        "Do not add arbitrary recent-day limits to trend queries. "
         "If you already have enough evidence, return action=finish. "
         "Return JSON only."
     )
@@ -368,7 +373,7 @@ def _execute_sql_step(
         scenario_id=scenario_id,
         sql=sql,
         allowed_tables=allowed_sql_tables,
-        max_rows=MAX_RESULT_ROWS,
+        max_rows=MAX_CHART_RESULT_ROWS if action.get("answer_mode") == "chart" else MAX_TABLE_RESULT_ROWS,
     )
     if not result["ok"]:
         return {
@@ -438,7 +443,7 @@ def _execute_document_step(
         "sources": [source],
         "columns": ["term", "excerpt"],
         "rows": rows,
-        "truncated": len(rows) >= MAX_RESULT_ROWS,
+        "truncated": len(rows) >= MAX_TABLE_RESULT_ROWS,
     }
 
 
@@ -477,6 +482,10 @@ def _synthesize_response(
         if warnings:
             return bounded_warning or warnings[0]
         return "I could not find enough evidence in my allowed sources to answer that."
+
+    deterministic_response = _structured_evidence_response(query, evidence)
+    if deterministic_response:
+        return deterministic_response
 
     system = _role_system_prompt(agent, role) + (
         "\n\nWrite a concise, evidence-grounded answer. "
@@ -518,6 +527,7 @@ def _role_system_prompt(agent: str, role: dict[str, Any]) -> str:
         "If the user's request is materially ambiguous, you may ask one clarifying question at a time. "
         "Before asking for clarification, inspect the provided schema, sample rows, distinct categorical values, "
         "and, if needed, use a small discovery query to resolve the ambiguity from the database. "
+        "For trend or time-series questions, use the full available date range from the metadata unless the user explicitly asks for a narrower window. "
         "Stay within evidence from your allowed sources only."
     )
 
@@ -539,6 +549,7 @@ def _build_source_metadata(
                 "row_count": get_table_row_count(scenario_id, table),
                 "sample_rows": get_sample_rows(scenario_id, table, 3),
                 "distinct_value_previews": get_distinct_value_previews(scenario_id, table),
+                "date_ranges": get_table_date_ranges(scenario_id, table),
             }
         )
     for source in allowed_documents:
@@ -673,7 +684,21 @@ def _artifact_from_evidence(item: dict[str, Any], citation_id: str, agent: str) 
             "card_variant": "metric",
             "summary": item["summary"],
         }
-    if rows and len(columns) >= 2 and len(rows) <= 12 and numeric_columns:
+    if rows and answer_mode == "table":
+        return {
+            "kind": "table",
+            "title": item["title"],
+            "columns": columns,
+            "rows": rows,
+            "citation_ids": [citation_id],
+            "purpose": "supporting_evidence",
+            "display_mode": "board_default",
+            "source_role": agent,
+            "confidence": "medium",
+            "card_variant": "table",
+            "summary": item["summary"],
+        }
+    if rows and len(columns) >= 2 and numeric_columns and (answer_mode == "chart" or len(rows) <= 12):
         label_column = next((col for col in columns if col not in numeric_columns), columns[0])
         value_column = next((col for col in numeric_columns if col != label_column), numeric_columns[0])
         chart_type = "line" if _looks_like_time_column(rows, label_column) else "bar"
@@ -706,6 +731,46 @@ def _artifact_from_evidence(item: dict[str, Any], citation_id: str, agent: str) 
     }
 
 
+def _structured_evidence_response(query: str, evidence: list[dict[str, Any]]) -> str | None:
+    if len(evidence) != 1:
+        return None
+    item = evidence[0]
+    if item.get("answer_mode") != "table":
+        return None
+    rows = item.get("rows") or []
+    columns = item.get("columns") or []
+    if not rows or not columns or len(rows) > 12:
+        return None
+
+    title = str(item.get("title") or "Result").strip()
+    lines = [f"{title} from `{', '.join(item.get('sources', []))}`:"]
+    lines.append("")
+    lines.append(_markdown_table(columns, rows))
+    return "\n".join(lines)
+
+
+def _markdown_table(columns: list[str], rows: list[dict[str, Any]]) -> str:
+    headers = [str(column) for column in columns]
+    header_line = "| " + " | ".join(headers) + " |"
+    divider_line = "| " + " | ".join("---" for _ in headers) + " |"
+    body_lines = []
+    for row in rows:
+        values = [_markdown_cell(row.get(column)) for column in columns]
+        body_lines.append("| " + " | ".join(values) + " |")
+    return "\n".join([header_line, divider_line, *body_lines])
+
+
+def _markdown_cell(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, float):
+        if value.is_integer():
+            value = int(value)
+        else:
+            value = round(value, 2)
+    return str(value).replace("|", "\\|")
+
+
 def _default_next_steps(role: dict[str, Any]) -> list[str]:
     skills = role.get("skills", [])
     if len(skills) >= 2:
@@ -726,7 +791,7 @@ def _document_rows(content: str, terms: list[str], query: str) -> list[dict[str,
         rows.append({"term": term, "excerpt": content[start:end].replace("\n", " ").strip()})
     if not rows:
         rows.append({"term": "preview", "excerpt": content[:280].replace("\n", " ").strip()})
-    return rows[:MAX_RESULT_ROWS]
+    return rows[:MAX_TABLE_RESULT_ROWS]
 
 
 def _summarize_attempt(record: dict[str, Any]) -> str:

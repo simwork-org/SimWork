@@ -145,6 +145,28 @@ def get_distinct_value_previews(
     return previews
 
 
+def get_table_date_ranges(scenario_id: str, table: str) -> list[dict[str, str]]:
+    """Return min/max values for date-like columns in a table."""
+    ranges: list[dict[str, str]] = []
+    for column in get_table_schema(scenario_id, table):
+        column_name = column["name"]
+        lowered = column_name.lower()
+        if not any(token in lowered for token in ("date", "time", "timestamp", "_at")):
+            continue
+        min_value = query_value(scenario_id, f"SELECT MIN([{column_name}]) FROM [{table}] WHERE [{column_name}] IS NOT NULL")
+        max_value = query_value(scenario_id, f"SELECT MAX([{column_name}]) FROM [{table}] WHERE [{column_name}] IS NOT NULL")
+        if min_value is None or max_value is None:
+            continue
+        ranges.append(
+            {
+                "column": column_name,
+                "min": str(min_value),
+                "max": str(max_value),
+            }
+        )
+    return ranges
+
+
 def close_all() -> None:
     """Close all cached connections."""
     for conn in _connections.values():
