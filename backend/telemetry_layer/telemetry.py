@@ -10,10 +10,14 @@ from __future__ import annotations
 # Which database tables/documents each agent role can access
 AGENT_TABLE_ACCESS: dict[str, list[str]] = {
     "analyst": [
-        "orders",
-        "payments",
-        "sessions_events",
         "users",
+        "orders",
+        "order_items",
+        "payments",
+        "restaurants",
+        "menu_items",
+        "drivers",
+        "funnel_events",
     ],
     "ux_researcher": [
         "reviews",

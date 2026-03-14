@@ -3,7 +3,7 @@
 Thumbs.db
 
 # Database files
-# *.db
+*.db
 *.sqlite3
 
 # Env files (secrets)

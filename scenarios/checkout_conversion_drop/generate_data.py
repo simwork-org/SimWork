@@ -3,15 +3,20 @@
 Generate India-native scenario data for SimWork's checkout conversion drop case.
 
 Scenario:
-- Company: ZaikaNow, a fictional India food-delivery marketplace
-- Challenge: order softness after a gateway migration
-- Root cause: RupeeFlow v3 migration on Jan 10, 2025 degraded UPI confirmation flows,
-  strongest on Android users in high-volume metros
+- Company: ZaikaNow, a fictional India food-delivery marketplace (inspired by Swiggy/Zomato)
+- Three embedded problems at different difficulty levels:
+  - Easy:   "Promo Cliff" — New Year campaign ending looks like a drop
+  - Medium: "RupeeFlow v3 Migration" — UPI payment regression on Jan 10
+  - Hard:   "Trust Erosion Cascade" — behavioral trust damage persists after technical fix
+
+Schema principles:
+- MECE: each fact lives in ONE table, referenced via FK elsewhere
+- city/platform/user_type live in `users` — other tables JOIN to get them
+- ~50K orders over 6 months (Oct 2024 – Mar 2025)
 """
 
 from __future__ import annotations
 
-import csv
 import hashlib
 import os
 import random
@@ -26,161 +31,165 @@ TABLES_DIR = os.path.join(SCRIPT_DIR, "tables")
 DB_PATH = os.path.join(TABLES_DIR, "scenario.db")
 os.makedirs(TABLES_DIR, exist_ok=True)
 
-START_DATE = datetime(2024, 7, 1)
+# ---------------------------------------------------------------------------
+# Timeline constants
+# ---------------------------------------------------------------------------
+START_DATE = datetime(2024, 10, 1)
 END_DATE = datetime(2025, 3, 31, 23, 59, 59)
+PROMO_START = datetime(2024, 12, 26)
+PROMO_END = datetime(2025, 1, 5)
 MIGRATION_DATE = datetime(2025, 1, 10)
 HOTFIX_DATE = datetime(2025, 2, 1)
 TRUST_DAMAGE_DATE = datetime(2025, 2, 16)
 
-MARKET_PROFILES = {
-    "india_food_delivery": {
-        "brand_name": "ZaikaNow",
-        "country": "India",
-        "currency": "INR",
-        "email_domain": "zaikanow.in",
-        "cities": [
-            ("bengaluru", 24, ["Koramangala", "Indiranagar", "HSR Layout", "Whitefield", "Jayanagar"]),
-            ("mumbai", 21, ["Andheri West", "Powai", "Bandra", "Ghatkopar", "Lower Parel"]),
-            ("delhi_ncr", 19, ["Gurugram Sector 56", "Noida Sector 62", "Saket", "Dwarka", "Indirapuram"]),
-            ("hyderabad", 14, ["Madhapur", "Gachibowli", "Kondapur", "Banjara Hills", "Kukatpally"]),
-            ("pune", 12, ["Hinjewadi", "Kothrud", "Viman Nagar", "Baner", "Wakad"]),
-            ("chennai", 10, ["Velachery", "Anna Nagar", "Adyar", "OMR", "T Nagar"]),
-        ],
-        "platform_mix": [18, 62, 20],  # ios, android, web
-        "platforms": ["ios", "android", "web"],
-        "user_types": ["new", "casual", "returning", "power"],
-        "user_type_mix": [28, 27, 30, 15],
-        "first_names": [
-            "Aarav", "Vivaan", "Aditya", "Vihaan", "Arjun", "Sai", "Ishaan", "Reyansh", "Krishna", "Rohan",
-            "Ananya", "Diya", "Aadhya", "Mira", "Saanvi", "Ira", "Kiara", "Myra", "Kavya", "Nitya",
-            "Rahul", "Karthik", "Varun", "Pranav", "Akash", "Nikhil", "Siddharth", "Harsh", "Yash", "Neha",
-            "Pooja", "Riya", "Sneha", "Anika", "Ishita", "Shruti", "Aarti", "Nandini", "Meera", "Tanvi",
-            "Aman", "Ritika", "Sakshi", "Abhishek", "Divya", "Manav", "Preeti", "Lakshmi", "Arvind", "Priya",
-            "Deepak", "Ayesha", "Vikram", "Shreya", "Madhav", "Anjali", "Surya", "Bhavna", "Ritesh", "Manya",
-        ],
-        "last_names": [
-            "Sharma", "Verma", "Patel", "Reddy", "Nair", "Rao", "Iyer", "Gupta", "Agarwal", "Mehta",
-            "Kulkarni", "Joshi", "Yadav", "Singh", "Khan", "Chopra", "Bansal", "Kapoor", "Mishra", "Pillai",
-            "Menon", "Saxena", "Ghosh", "Bose", "Banerjee", "Desai", "Bhatt", "Trivedi", "Pandey", "Choudhary",
-            "Malhotra", "Sethi", "Jain", "Dubey", "Tiwari", "Kamble", "Shetty", "Das", "Mukherjee", "Thakur",
-        ],
-        "restaurant_taxonomy": {
-            "north_indian": {
-                "names": ["Punjabi Tadka", "Dilli Zaika", "Tandoor Junction", "Royal Curry House", "Ghar Ka Khana Co."],
-                "menu": [
-                    ("Butter Chicken", "Creamy tomato gravy with tandoori chicken", 329),
-                    ("Paneer Lababdar", "Rich tomato gravy with paneer cubes", 289),
-                    ("Dal Makhani", "Slow-cooked black lentils with butter", 249),
-                    ("Butter Naan", "Tandoor-baked naan brushed with butter", 49),
-                    ("Veg Thali", "North Indian combo meal with roti and rice", 269),
-                ],
-            },
-            "south_indian": {
-                "names": ["Anna Idli House", "Udupi Breakfast Club", "Filter Coffee Stories", "Dosa Darbar", "Ghee Roast Kitchen"],
-                "menu": [
-                    ("Masala Dosa", "Crisp dosa with potato filling", 149),
-                    ("Idli Vada Combo", "Steamed idlis with vada and chutneys", 129),
-                    ("Podi Dosa", "Dosa dusted with podi masala", 159),
-                    ("Mini Tiffin", "Assorted breakfast platter", 189),
-                    ("Filter Coffee", "South Indian filter kaapi", 59),
-                ],
-            },
-            "biryani": {
-                "names": ["Biryani Adda", "Nawab Dum House", "Hyderabadi Handi", "Biryani Junction", "Dum Safar"],
-                "menu": [
-                    ("Chicken Dum Biryani", "Hyderabadi-style chicken biryani", 299),
-                    ("Paneer Biryani", "Fragrant rice layered with paneer masala", 259),
-                    ("Mutton Biryani", "Slow-cooked biryani with tender mutton", 379),
-                    ("Double Ka Meetha", "Traditional Hyderabadi dessert", 99),
-                    ("Mirchi Ka Salan", "Spicy peanut-coconut curry", 79),
-                ],
-            },
-            "street_food": {
-                "names": ["Rolls & Rice", "The Frankie Stop", "Nukkad Eats", "Bombay Bites", "Street Treats Co."],
-                "menu": [
-                    ("Paneer Kathi Roll", "Roomali roll stuffed with paneer tikka", 169),
-                    ("Chicken Shawarma Roll", "Loaded shawarma with garlic mayo", 189),
-                    ("Pav Bhaji", "Buttery bhaji served with pav", 149),
-                    ("Veg Momos", "Steamed momos with red chutney", 129),
-                    ("Chicken Momos", "Juicy steamed chicken momos", 149),
-                ],
-            },
-            "chaat": {
-                "names": ["Chaat Junction", "Tangy Tales", "Raj Kachori Point", "Chatpata Express", "Golgappa Factory"],
-                "menu": [
-                    ("Raj Kachori", "Crisp kachori loaded with chaat toppings", 139),
-                    ("Dahi Puri", "Crispy puris with curd and chutneys", 119),
-                    ("Papdi Chaat", "Papdi with potatoes, curd, and chutneys", 109),
-                    ("Sev Puri", "Mumbai-style street snack", 99),
-                    ("Pani Puri Kit", "Take-home golgappa set", 129),
-                ],
-            },
-            "desserts": {
-                "names": ["Kulfi Collective", "Mithai Studio", "Sweet Cravings", "Dessert Wale", "Shahi Sweets"],
-                "menu": [
-                    ("Matka Kulfi", "Traditional kulfi served in clay pot", 99),
-                    ("Gulab Jamun", "Warm gulab jamun with syrup", 89),
-                    ("Rasmalai", "Soft rasmalai in saffron milk", 109),
-                    ("Chocolate Brownie", "Brownie with hot chocolate sauce", 139),
-                    ("Falooda", "Rose falooda with ice cream", 149),
-                ],
-            },
-            "pizza": {
-                "names": ["Pizza Planet India", "Cheese Burst Co.", "Slice Junction", "Oven Stories Local", "Crust Republic"],
-                "menu": [
-                    ("Paneer Tikka Pizza", "Pizza topped with paneer tikka and onions", 279),
-                    ("Farmhouse Pizza", "Capsicum, mushroom, onion, tomato", 259),
-                    ("Chicken Keema Pizza", "Spiced keema pizza with cheese", 299),
-                    ("Garlic Breadsticks", "Garlicky breadsticks with dip", 119),
-                    ("Choco Lava Cake", "Warm chocolate-filled cake", 99),
-                ],
-            },
-            "burgers": {
-                "names": ["Patty Pe Charcha", "Burger Adda", "Stacked Bun Co.", "Smash & Spice", "Desi Burger Lab"],
-                "menu": [
-                    ("Aloo Tikki Burger", "Classic Indian veg burger", 129),
-                    ("Peri Peri Paneer Burger", "Paneer patty with peri peri sauce", 179),
-                    ("Chicken Maharaja Burger", "Double chicken burger with signature sauce", 229),
-                    ("Masala Fries", "Fries tossed in Indian spice mix", 99),
-                    ("Cold Coffee", "Iced coffee with vanilla ice cream", 119),
-                ],
-            },
-            "chinese": {
-                "names": ["Wok on Fire", "Dragon Wok Express", "Desi Chinese Hub", "Hakka Stories", "Wok & Bowl"],
-                "menu": [
-                    ("Veg Hakka Noodles", "Indo-Chinese wok tossed noodles", 169),
-                    ("Chicken Fried Rice", "Classic fried rice with chicken", 199),
-                    ("Chilli Paneer", "Paneer tossed in spicy chilli sauce", 189),
-                    ("Chicken Manchurian", "Juicy chicken balls in gravy", 219),
-                    ("Schezwan Momos", "Momos tossed in schezwan sauce", 159),
-                ],
-            },
-            "healthy": {
-                "names": ["Balanced Bowls", "Salad & Soul", "Protein Pantry", "Fresh Pressed", "Green Plate Kitchen"],
-                "menu": [
-                    ("Paneer Quinoa Bowl", "High-protein bowl with paneer and quinoa", 249),
-                    ("Chicken Millet Bowl", "Millet bowl with grilled chicken", 279),
-                    ("Greek Yogurt Parfait", "Yogurt, fruit, and granola", 159),
-                    ("Cold Pressed Juice", "Seasonal fruit and veggie juice", 129),
-                    ("Sprouts Chaat", "Protein-rich sprout salad", 149),
-                ],
-            },
+# ---------------------------------------------------------------------------
+# Market profile — India food delivery
+# ---------------------------------------------------------------------------
+PROFILE = {
+    "brand_name": "ZaikaNow",
+    "currency": "INR",
+    "email_domain": "zaikanow.in",
+    "cities": [
+        ("bengaluru", 24, ["Koramangala", "Indiranagar", "HSR Layout", "Whitefield", "Jayanagar"]),
+        ("mumbai", 21, ["Andheri West", "Powai", "Bandra", "Ghatkopar", "Lower Parel"]),
+        ("delhi_ncr", 19, ["Gurugram Sector 56", "Noida Sector 62", "Saket", "Dwarka", "Indirapuram"]),
+        ("hyderabad", 14, ["Madhapur", "Gachibowli", "Kondapur", "Banjara Hills", "Kukatpally"]),
+        ("pune", 12, ["Hinjewadi", "Kothrud", "Viman Nagar", "Baner", "Wakad"]),
+        ("chennai", 10, ["Velachery", "Anna Nagar", "Adyar", "OMR", "T Nagar"]),
+    ],
+    "platforms": ["ios", "android", "web"],
+    "platform_mix": [18, 62, 20],
+    "user_types": ["new", "casual", "returning", "power"],
+    "user_type_mix": [28, 27, 30, 15],
+    "first_names": [
+        "Aarav", "Vivaan", "Aditya", "Vihaan", "Arjun", "Sai", "Ishaan", "Reyansh", "Krishna", "Rohan",
+        "Ananya", "Diya", "Aadhya", "Mira", "Saanvi", "Ira", "Kiara", "Myra", "Kavya", "Nitya",
+        "Rahul", "Karthik", "Varun", "Pranav", "Akash", "Nikhil", "Siddharth", "Harsh", "Yash", "Neha",
+        "Pooja", "Riya", "Sneha", "Anika", "Ishita", "Shruti", "Aarti", "Nandini", "Meera", "Tanvi",
+        "Aman", "Ritika", "Sakshi", "Abhishek", "Divya", "Manav", "Preeti", "Lakshmi", "Arvind", "Priya",
+        "Deepak", "Ayesha", "Vikram", "Shreya", "Madhav", "Anjali", "Surya", "Bhavna", "Ritesh", "Manya",
+    ],
+    "last_names": [
+        "Sharma", "Verma", "Patel", "Reddy", "Nair", "Rao", "Iyer", "Gupta", "Agarwal", "Mehta",
+        "Kulkarni", "Joshi", "Yadav", "Singh", "Khan", "Chopra", "Bansal", "Kapoor", "Mishra", "Pillai",
+        "Menon", "Saxena", "Ghosh", "Bose", "Banerjee", "Desai", "Bhatt", "Trivedi", "Pandey", "Choudhary",
+        "Malhotra", "Sethi", "Jain", "Dubey", "Tiwari", "Kamble", "Shetty", "Das", "Mukherjee", "Thakur",
+    ],
+    "restaurant_taxonomy": {
+        "north_indian": {
+            "names": ["Punjabi Tadka", "Dilli Zaika", "Tandoor Junction", "Royal Curry House", "Ghar Ka Khana Co."],
+            "menu": [
+                ("Butter Chicken", "Creamy tomato gravy with tandoori chicken", 329),
+                ("Paneer Lababdar", "Rich tomato gravy with paneer cubes", 289),
+                ("Dal Makhani", "Slow-cooked black lentils with butter", 249),
+                ("Butter Naan", "Tandoor-baked naan brushed with butter", 49),
+                ("Veg Thali", "North Indian combo meal with roti and rice", 269),
+            ],
         },
-        "ios_devices": ["iPhone 13", "iPhone 14", "iPhone 15", "iPhone 15 Pro", "iPhone SE"],
-        "android_devices": ["OnePlus 12", "Samsung S24", "Pixel 8", "Redmi Note 13", "Vivo V30", "Realme GT"],
-        "web_devices": ["Chrome", "Safari", "Firefox", "Edge"],
-        "bank_names": ["HDFC Bank", "ICICI Bank", "SBI", "Axis Bank", "Kotak", "IDFC First"],
-        "incident_profile": {
-            "primary_cities": {"bengaluru", "mumbai", "delhi_ncr"},
-            "primary_platform": "android",
-            "primary_method": "upi",
-            "provider_v2": "rupeeflow_v2",
-            "provider_v3": "rupeeflow_v3",
+        "south_indian": {
+            "names": ["Anna Idli House", "Udupi Breakfast Club", "Filter Coffee Stories", "Dosa Darbar", "Ghee Roast Kitchen"],
+            "menu": [
+                ("Masala Dosa", "Crisp dosa with potato filling", 149),
+                ("Idli Vada Combo", "Steamed idlis with vada and chutneys", 129),
+                ("Podi Dosa", "Dosa dusted with podi masala", 159),
+                ("Mini Tiffin", "Assorted breakfast platter", 189),
+                ("Filter Coffee", "South Indian filter kaapi", 59),
+            ],
         },
-    }
+        "biryani": {
+            "names": ["Biryani Adda", "Nawab Dum House", "Hyderabadi Handi", "Biryani Junction", "Dum Safar"],
+            "menu": [
+                ("Chicken Dum Biryani", "Hyderabadi-style chicken biryani", 299),
+                ("Paneer Biryani", "Fragrant rice layered with paneer masala", 259),
+                ("Mutton Biryani", "Slow-cooked biryani with tender mutton", 379),
+                ("Double Ka Meetha", "Traditional Hyderabadi dessert", 99),
+                ("Mirchi Ka Salan", "Spicy peanut-coconut curry", 79),
+            ],
+        },
+        "street_food": {
+            "names": ["Rolls & Rice", "The Frankie Stop", "Nukkad Eats", "Bombay Bites", "Street Treats Co."],
+            "menu": [
+                ("Paneer Kathi Roll", "Roomali roll stuffed with paneer tikka", 169),
+                ("Chicken Shawarma Roll", "Loaded shawarma with garlic mayo", 189),
+                ("Pav Bhaji", "Buttery bhaji served with pav", 149),
+                ("Veg Momos", "Steamed momos with red chutney", 129),
+                ("Chicken Momos", "Juicy steamed chicken momos", 149),
+            ],
+        },
+        "chaat": {
+            "names": ["Chaat Junction", "Tangy Tales", "Raj Kachori Point", "Chatpata Express", "Golgappa Factory"],
+            "menu": [
+                ("Raj Kachori", "Crisp kachori loaded with chaat toppings", 139),
+                ("Dahi Puri", "Crispy puris with curd and chutneys", 119),
+                ("Papdi Chaat", "Papdi with potatoes, curd, and chutneys", 109),
+                ("Sev Puri", "Mumbai-style street snack", 99),
+                ("Pani Puri Kit", "Take-home golgappa set", 129),
+            ],
+        },
+        "desserts": {
+            "names": ["Kulfi Collective", "Mithai Studio", "Sweet Cravings", "Dessert Wale", "Shahi Sweets"],
+            "menu": [
+                ("Matka Kulfi", "Traditional kulfi served in clay pot", 99),
+                ("Gulab Jamun", "Warm gulab jamun with syrup", 89),
+                ("Rasmalai", "Soft rasmalai in saffron milk", 109),
+                ("Chocolate Brownie", "Brownie with hot chocolate sauce", 139),
+                ("Falooda", "Rose falooda with ice cream", 149),
+            ],
+        },
+        "pizza": {
+            "names": ["Pizza Planet India", "Cheese Burst Co.", "Slice Junction", "Oven Stories Local", "Crust Republic"],
+            "menu": [
+                ("Paneer Tikka Pizza", "Pizza topped with paneer tikka and onions", 279),
+                ("Farmhouse Pizza", "Capsicum, mushroom, onion, tomato", 259),
+                ("Chicken Keema Pizza", "Spiced keema pizza with cheese", 299),
+                ("Garlic Breadsticks", "Garlicky breadsticks with dip", 119),
+                ("Choco Lava Cake", "Warm chocolate-filled cake", 99),
+            ],
+        },
+        "burgers": {
+            "names": ["Patty Pe Charcha", "Burger Adda", "Stacked Bun Co.", "Smash & Spice", "Desi Burger Lab"],
+            "menu": [
+                ("Aloo Tikki Burger", "Classic Indian veg burger", 129),
+                ("Peri Peri Paneer Burger", "Paneer patty with peri peri sauce", 179),
+                ("Chicken Maharaja Burger", "Double chicken burger with signature sauce", 229),
+                ("Masala Fries", "Fries tossed in Indian spice mix", 99),
+                ("Cold Coffee", "Iced coffee with vanilla ice cream", 119),
+            ],
+        },
+        "chinese": {
+            "names": ["Wok on Fire", "Dragon Wok Express", "Desi Chinese Hub", "Hakka Stories", "Wok & Bowl"],
+            "menu": [
+                ("Veg Hakka Noodles", "Indo-Chinese wok tossed noodles", 169),
+                ("Chicken Fried Rice", "Classic fried rice with chicken", 199),
+                ("Chilli Paneer", "Paneer tossed in spicy chilli sauce", 189),
+                ("Chicken Manchurian", "Juicy chicken balls in gravy", 219),
+                ("Schezwan Momos", "Momos tossed in schezwan sauce", 159),
+            ],
+        },
+        "healthy": {
+            "names": ["Balanced Bowls", "Salad & Soul", "Protein Pantry", "Fresh Pressed", "Green Plate Kitchen"],
+            "menu": [
+                ("Paneer Quinoa Bowl", "High-protein bowl with paneer and quinoa", 249),
+                ("Chicken Millet Bowl", "Millet bowl with grilled chicken", 279),
+                ("Greek Yogurt Parfait", "Yogurt, fruit, and granola", 159),
+                ("Cold Pressed Juice", "Seasonal fruit and veggie juice", 129),
+                ("Sprouts Chaat", "Protein-rich sprout salad", 149),
+            ],
+        },
+    },
+    "ios_devices": ["iPhone 13", "iPhone 14", "iPhone 15", "iPhone 15 Pro", "iPhone SE"],
+    "android_devices": ["OnePlus 12", "Samsung S24", "Pixel 8", "Redmi Note 13", "Vivo V30", "Realme GT"],
+    "web_devices": ["Chrome", "Safari", "Firefox", "Edge"],
+    "bank_names": ["HDFC Bank", "ICICI Bank", "SBI", "Axis Bank", "Kotak", "IDFC First"],
+    "incident_profile": {
+        "primary_cities": {"bengaluru", "mumbai", "delhi_ncr"},
+        "primary_platform": "android",
+        "primary_method": "upi",
+        "provider_v2": "rupeeflow_v2",
+        "provider_v3": "rupeeflow_v3",
+    },
 }
 
-PROFILE = MARKET_PROFILES["india_food_delivery"]
 PLATFORMS = PROFILE["platforms"]
 CITIES = [city for city, _, _ in PROFILE["cities"]]
 CITY_WEIGHTS = [weight for _, weight, _ in PROFILE["cities"]]
@@ -189,6 +198,9 @@ USER_TYPES = PROFILE["user_types"]
 CONN: sqlite3.Connection | None = None
 
 
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 def jitter(value: float, pct: float = 0.05) -> float:
     return value * (1 + random.uniform(-pct, pct))
 
@@ -214,60 +226,6 @@ def sanitize_token(text: str) -> str:
     return "".join(ch.lower() for ch in text if ch.isalnum())
 
 
-def reset_database() -> sqlite3.Connection:
-    if os.path.exists(DB_PATH):
-        os.remove(DB_PATH)
-    conn = sqlite3.connect(DB_PATH)
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS documents (
-            name TEXT PRIMARY KEY,
-            content TEXT NOT NULL
-        )
-        """
-    )
-    conn.commit()
-    return conn
-
-
-def _infer_sqlite_type(values: list[object]) -> str:
-    non_null = [value for value in values if value not in {"", None}]
-    if not non_null:
-        return "TEXT"
-    if all(isinstance(value, int) and not isinstance(value, bool) for value in non_null):
-        return "INTEGER"
-    if all(isinstance(value, (int, float)) and not isinstance(value, bool) for value in non_null):
-        return "REAL"
-    return "TEXT"
-
-
-def write_table(table_name: str, headers: list[str], rows: list[list[object]]) -> None:
-    if CONN is None:
-        raise RuntimeError("Database connection has not been initialized.")
-    column_types = [_infer_sqlite_type([row[index] for row in rows]) for index in range(len(headers))]
-    quoted_columns = ", ".join(f"[{header}] {column_type}" for header, column_type in zip(headers, column_types))
-    placeholders = ", ".join("?" for _ in headers)
-    CONN.execute(f"DROP TABLE IF EXISTS [{table_name}]")
-    CONN.execute(f"CREATE TABLE [{table_name}] ({quoted_columns})")
-    CONN.executemany(
-        f"INSERT INTO [{table_name}] ({', '.join(f'[{header}]' for header in headers)}) VALUES ({placeholders})",
-        rows,
-    )
-    CONN.commit()
-    print(f"  -> {table_name}: {len(rows)} rows")
-
-
-def write_md(filename: str, content: str) -> None:
-    if CONN is None:
-        raise RuntimeError("Database connection has not been initialized.")
-    CONN.execute(
-        "INSERT OR REPLACE INTO documents (name, content) VALUES (?, ?)",
-        (filename, content),
-    )
-    CONN.commit()
-    print(f"  -> {filename}: written to documents table")
-
-
 def phase_for_date(current: datetime) -> str:
     if current < MIGRATION_DATE:
         return "baseline"
@@ -278,56 +236,118 @@ def phase_for_date(current: datetime) -> str:
     return "trust_damage"
 
 
+def is_promo_period(current: datetime) -> bool:
+    return PROMO_START.date() <= current.date() <= PROMO_END.date()
+
+
 def city_is_primary(city: str) -> bool:
     return city in PROFILE["incident_profile"]["primary_cities"]
 
 
-def generate_users(n: int = 6500):
-    print("Generating users table...")
+# ---------------------------------------------------------------------------
+# Database helpers
+# ---------------------------------------------------------------------------
+def reset_database() -> sqlite3.Connection:
+    if os.path.exists(DB_PATH):
+        os.remove(DB_PATH)
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("CREATE TABLE IF NOT EXISTS documents (name TEXT PRIMARY KEY, content TEXT NOT NULL)")
+    conn.commit()
+    return conn
+
+
+def _infer_sqlite_type(values: list[object]) -> str:
+    non_null = [v for v in values if v not in {"", None}]
+    if not non_null:
+        return "TEXT"
+    if all(isinstance(v, int) and not isinstance(v, bool) for v in non_null):
+        return "INTEGER"
+    if all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in non_null):
+        return "REAL"
+    return "TEXT"
+
+
+def write_table(table_name: str, headers: list[str], rows: list[list[object]]) -> None:
+    if CONN is None:
+        raise RuntimeError("Database connection not initialized.")
+    column_types = [_infer_sqlite_type([row[i] for row in rows]) for i in range(len(headers))]
+    col_defs = ", ".join(f"[{h}] {t}" for h, t in zip(headers, column_types))
+    placeholders = ", ".join("?" for _ in headers)
+    CONN.execute(f"DROP TABLE IF EXISTS [{table_name}]")
+    CONN.execute(f"CREATE TABLE [{table_name}] ({col_defs})")
+    CONN.executemany(
+        f"INSERT INTO [{table_name}] ({', '.join(f'[{h}]' for h in headers)}) VALUES ({placeholders})",
+        rows,
+    )
+    CONN.commit()
+    print(f"  -> {table_name}: {len(rows)} rows")
+
+
+def write_md(filename: str, content: str) -> None:
+    if CONN is None:
+        raise RuntimeError("Database connection not initialized.")
+    CONN.execute("INSERT OR REPLACE INTO documents (name, content) VALUES (?, ?)", (filename, content))
+    CONN.commit()
+    print(f"  -> {filename}: written to documents table")
+
+
+# ===========================================================================
+# TABLE GENERATORS
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# 1. users — PK: user_id — SINGLE source of truth for city, platform, user_type
+# ---------------------------------------------------------------------------
+def generate_users(n: int = 3000):
+    print("Generating users...")
     rows = []
     for i in range(1, n + 1):
         user_id = f"U{i:05d}"
         first = random.choice(PROFILE["first_names"])
         last = random.choice(PROFILE["last_names"])
         city = weighted_choice(CITIES, CITY_WEIGHTS)
+        area = random.choice(CITY_AREAS[city])
         platform = weighted_choice(PLATFORMS, PROFILE["platform_mix"])
         user_type = weighted_choice(USER_TYPES, PROFILE["user_type_mix"])
         signup = random_datetime(datetime(2023, 1, 1), datetime(2025, 3, 20)).strftime("%Y-%m-%d")
         email = f"{sanitize_token(first)}.{sanitize_token(last)}{i}@{PROFILE['email_domain']}"
-        rows.append([user_id, f"{first} {last}", email, gen_phone(), signup, platform, city, user_type])
-    write_table("users", ["user_id", "name", "email", "phone", "signup_date", "platform", "city", "user_type"], rows)
+        rows.append([user_id, f"{first} {last}", email, gen_phone(), city, area, signup, platform, user_type])
+    write_table("users", ["user_id", "name", "email", "phone", "city", "area", "signup_date", "platform", "user_type"], rows)
     return rows
 
 
-def generate_restaurants(users):
-    print("Generating restaurants table...")
+# ---------------------------------------------------------------------------
+# 2. restaurants — PK: restaurant_id — own city/area (restaurant location ≠ user location)
+# ---------------------------------------------------------------------------
+def generate_restaurants():
+    print("Generating restaurants...")
     rows = []
-    restaurant_id = 1
+    rid = 1
     for city in CITIES:
         for cuisine, details in PROFILE["restaurant_taxonomy"].items():
             names = details["names"]
             for name in random.sample(names, min(2, len(names))):
                 area = random.choice(CITY_AREAS[city])
-                address = f"Shop {random.randint(3, 220)}, {area}, {city.replace('_', ' ').title()}"
-                owner_id = random.choice(users)[0]
                 rating = round(random.uniform(3.7, 4.8), 1)
-                rows.append([f"R{restaurant_id:04d}", name, cuisine, address, rating, owner_id])
-                restaurant_id += 1
-    write_table("restaurants", ["restaurant_id", "name", "cuisine_type", "address", "rating", "owner_id"], rows)
+                rows.append([f"R{rid:04d}", name, cuisine, city, area, rating])
+                rid += 1
+    write_table("restaurants", ["restaurant_id", "name", "cuisine_type", "city", "area", "rating"], rows)
     return rows
 
 
+# ---------------------------------------------------------------------------
+# 3. menu_items — PK: item_id — FK: restaurant_id
+# ---------------------------------------------------------------------------
 def generate_menu_items(restaurants):
-    print("Generating menu_items table...")
+    print("Generating menu_items...")
     rows = []
     item_id = 1
     restaurant_menu_map = {}
-    cuisine_map = PROFILE["restaurant_taxonomy"]
     for restaurant in restaurants:
         restaurant_id = restaurant[0]
         cuisine = restaurant[2]
-        menu_items = cuisine_map[cuisine]["menu"]
-        sampled = random.sample(menu_items, min(len(menu_items), random.randint(4, 5)))
+        menu = PROFILE["restaurant_taxonomy"][cuisine]["menu"]
+        sampled = random.sample(menu, min(len(menu), random.randint(4, 5)))
         ids = []
         for name, description, price in sampled:
             ids.append(f"MI{item_id:05d}")
@@ -338,32 +358,41 @@ def generate_menu_items(restaurants):
     return rows, restaurant_menu_map
 
 
+# ---------------------------------------------------------------------------
+# 4. orders — PK: order_id — FK: user_id, restaurant_id
+#    NO platform/city columns — JOIN to users for those
+# ---------------------------------------------------------------------------
 def daily_order_target(current: datetime) -> int:
-    base_by_month = {
-        7: 300, 8: 315, 9: 325, 10: 340, 11: 355, 12: 390,
-        1: 365, 2: 330, 3: 345,
-    }
+    """~275/day baseline, with promo spike and trust damage dip."""
+    base_by_month = {10: 240, 11: 260, 12: 290, 1: 275, 2: 255, 3: 265}
     base = base_by_month[current.month]
+    # Weekend bump
     if current.weekday() in (5, 6):
         base = int(base * 1.12)
-    if datetime(2024, 12, 26).date() <= current.date() <= datetime(2025, 1, 5).date():
-        base = int(base * 1.18)
+    # Easy problem: promo spike — sharply visible, 25% bump
+    if is_promo_period(current):
+        base = int(base * 1.25)
+    # Republic Day minor bump
     if datetime(2025, 1, 24).date() <= current.date() <= datetime(2025, 1, 26).date():
         base = int(base * 1.08)
+    # Hard problem: trust damage — subtle 8% overall dip
     if phase_for_date(current) == "trust_damage":
-        base = int(base * 0.95)
-    return max(180, int(jitter(base, 0.08)))
+        base = int(base * 0.92)
+    return max(150, int(jitter(base, 0.08)))
 
 
 def order_status_probs(current: datetime, platform: str, city: str, user_type: str) -> tuple[float, float]:
+    """Return (fail_rate, cancel_rate) based on phase/segment."""
     phase = phase_for_date(current)
     fail_rate = 0.04
-    cancel_rate = 0.11
+    cancel_rate = 0.10
 
     is_primary = city_is_primary(city)
+
     if phase == "incident":
+        # Medium problem: payment failures spike
         if platform == "android" and is_primary:
-            fail_rate = 0.17
+            fail_rate = 0.18
             cancel_rate = 0.16
         elif platform == "ios" and is_primary:
             fail_rate = 0.09
@@ -373,7 +402,7 @@ def order_status_probs(current: datetime, platform: str, city: str, user_type: s
             cancel_rate = 0.12
         else:
             fail_rate = 0.06
-            cancel_rate = 0.12
+            cancel_rate = 0.11
     elif phase == "partial_recovery":
         if platform == "android" and is_primary:
             fail_rate = 0.09
@@ -382,37 +411,48 @@ def order_status_probs(current: datetime, platform: str, city: str, user_type: s
             fail_rate = 0.05
             cancel_rate = 0.11
     elif phase == "trust_damage":
+        # Technical metrics mostly recovered
         fail_rate = 0.05
         cancel_rate = 0.10
+        # Hard problem: power/returning users on Android in primary metros
+        # show elevated cancellation — behavioral, not technical
         if user_type in {"returning", "power"} and platform == "android" and is_primary:
-            cancel_rate = 0.12
+            cancel_rate = 0.15  # vs 0.10 baseline — clear gap
 
     return fail_rate, cancel_rate
 
 
 def generate_orders(users, restaurants, restaurant_menu_map):
-    print("Generating orders table...")
-    user_lookup = {user[0]: {"platform": user[5], "city": user[6], "user_type": user[7]} for user in users}
-    users_by_platform = {platform: [user for user in users if user[5] == platform] for platform in PLATFORMS}
-    restaurant_ids = [restaurant[0] for restaurant in restaurants]
+    print("Generating orders...")
+    user_lookup = {u[0]: {"platform": u[7], "city": u[4], "user_type": u[8]} for u in users}
+    users_by_platform = {p: [u for u in users if u[7] == p] for p in PLATFORMS}
+    restaurant_ids = [r[0] for r in restaurants]
 
     rows = []
     order_id = 1
     current = START_DATE
     while current.date() <= END_DATE.date():
-        order_count = daily_order_target(current)
-        for _ in range(order_count):
-            phase = phase_for_date(current)
+        count = daily_order_target(current)
+        phase = phase_for_date(current)
+        for _ in range(count):
+            # Hard problem: trust damage shifts platform mix
             platform_weights = PROFILE["platform_mix"][:]
             if phase == "trust_damage":
-                platform_weights = [18, 58, 24]
+                platform_weights = [18, 56, 26]  # Android drops, web rises
+
             platform = weighted_choice(PLATFORMS, platform_weights)
+
+            # Hard problem: power/returning Android users in primary metros order ~20% less
             user = random.choice(users_by_platform[platform])
             user_id = user[0]
-            city = user[6]
-            user_type = user[7]
-            fail_rate, cancel_rate = order_status_probs(current, platform, city, user_type)
+            city = user_lookup[user_id]["city"]
+            user_type = user_lookup[user_id]["user_type"]
 
+            if phase == "trust_damage" and user_type in {"returning", "power"} and platform == "android" and city_is_primary(city):
+                if random.random() < 0.20:  # 20% of orders from this cohort don't happen
+                    continue
+
+            fail_rate, cancel_rate = order_status_probs(current, platform, city, user_type)
             r = random.random()
             if r < fail_rate:
                 status = "failed"
@@ -428,59 +468,44 @@ def generate_orders(users, restaurants, restaurant_menu_map):
                 [1, 1, 1, 1, 1, 1, 2, 3, 4, 5, 6, 7, 9, 8, 7, 5, 4, 5, 8, 10, 9, 7, 4, 2],
             )
             created_at = datetime.combine(current.date(), datetime.min.time()) + timedelta(
-                hours=hour,
-                minutes=random.randint(0, 59),
-                seconds=random.randint(0, 59),
+                hours=hour, minutes=random.randint(0, 59), seconds=random.randint(0, 59),
             )
+            # NO platform/city columns — these come from users via JOIN
             rows.append([
-                f"ORD{order_id:06d}",
-                user_id,
-                restaurant_id,
-                status,
-                f"{total_amount:.2f}",
-                platform,
-                city,
-                created_at.strftime("%Y-%m-%d %H:%M:%S"),
+                f"ORD{order_id:06d}", user_id, restaurant_id, status,
+                f"{total_amount:.2f}", created_at.strftime("%Y-%m-%d %H:%M:%S"),
             ])
             order_id += 1
         current += timedelta(days=1)
 
-    write_table(
-        "orders",
-        ["order_id", "user_id", "restaurant_id", "order_status", "total_amount", "platform", "city", "created_at"],
-        rows,
-    )
+    write_table("orders", ["order_id", "user_id", "restaurant_id", "order_status", "total_amount", "created_at"], rows)
     return rows, user_lookup
 
 
+# ---------------------------------------------------------------------------
+# 5. order_items — PK: order_item_id — FK: order_id, item_id
+# ---------------------------------------------------------------------------
 def generate_order_items(orders, restaurant_menu_map):
-    print("Generating order_items table...")
+    print("Generating order_items...")
     rows = []
-    order_item_id = 1
+    oi_id = 1
     for order in orders:
         restaurant_id = order[2]
         menu_ids = restaurant_menu_map.get(restaurant_id, [])
+        if not menu_ids:
+            continue
         for item_id in random.choices(menu_ids, k=weighted_choice([1, 2, 3, 4], [15, 42, 31, 12])):
             quantity = weighted_choice([1, 2, 3], [72, 23, 5])
-            rows.append([f"OI{order_item_id:06d}", order[0], item_id, quantity])
-            order_item_id += 1
+            rows.append([f"OI{oi_id:06d}", order[0], item_id, quantity])
+            oi_id += 1
     write_table("order_items", ["order_item_id", "order_id", "item_id", "quantity"], rows)
     return rows
 
 
-def generate_drivers(n: int = 260):
-    print("Generating drivers table...")
-    rows = []
-    statuses = ["available", "on_delivery", "offline"]
-    for i in range(1, n + 1):
-        first = random.choice(PROFILE["first_names"])
-        last = random.choice(PROFILE["last_names"])
-        city = weighted_choice(CITIES, CITY_WEIGHTS)
-        rows.append([f"D{i:04d}", f"{first} {last}", gen_phone(), city, weighted_choice(statuses, [44, 34, 22])])
-    write_table("drivers", ["driver_id", "name", "phone", "city", "availability_status"], rows)
-    return rows
-
-
+# ---------------------------------------------------------------------------
+# 6. payments — PK: payment_id — FK: order_id
+#    NO user_id/platform/city — get via orders → users
+# ---------------------------------------------------------------------------
 def payment_method_for(platform: str) -> str:
     if platform == "android":
         return weighted_choice(["upi", "credit_card", "debit_card", "wallet", "cod"], [62, 10, 13, 10, 5])
@@ -502,41 +527,27 @@ def payment_outcome(current: datetime, platform: str, city: str, user_type: str,
 
     if phase == "incident":
         if platform == "android" and is_primary and is_upi:
-            base_success = 0.68
-            timeout = 0.18
-            reversed_rate = 0.05
+            base_success, timeout, reversed_rate = 0.68, 0.18, 0.05
         elif is_upi and is_primary:
-            base_success = 0.79
-            timeout = 0.11
-            reversed_rate = 0.03
+            base_success, timeout, reversed_rate = 0.79, 0.11, 0.03
         elif is_upi:
-            base_success = 0.86
-            timeout = 0.08
-            reversed_rate = 0.02
+            base_success, timeout, reversed_rate = 0.86, 0.08, 0.02
         else:
-            base_success = 0.91
-            timeout = 0.04
+            base_success, timeout = 0.91, 0.04
     elif phase == "partial_recovery":
         if platform == "android" and is_primary and is_upi:
-            base_success = 0.84
-            timeout = 0.07
-            reversed_rate = 0.02
+            base_success, timeout, reversed_rate = 0.84, 0.07, 0.02
         elif is_upi:
-            base_success = 0.89
-            timeout = 0.05
+            base_success, timeout = 0.89, 0.05
         else:
-            base_success = 0.93
-            timeout = 0.03
+            base_success, timeout = 0.93, 0.03
     elif phase == "trust_damage":
         if platform == "android" and is_primary and is_upi:
-            base_success = 0.90
-            timeout = 0.04
-            reversed_rate = 0.015
+            base_success, timeout, reversed_rate = 0.90, 0.04, 0.015
 
     roll = random.random()
     if roll < base_success:
-        status = "success"
-        error = ""
+        status, error = "success", ""
     elif roll < base_success + timeout:
         status = "timeout"
         error = random.choice(["UPI_CALLBACK_TIMEOUT", "BANK_TIMEOUT"])
@@ -561,12 +572,13 @@ def payment_outcome(current: datetime, platform: str, city: str, user_type: str,
 
 
 def generate_payments(orders, user_lookup):
-    print("Generating payments table...")
+    print("Generating payments...")
     rows = []
-    for index, order in enumerate(orders, start=1):
-        order_id, user_id, _, order_status, amount, platform, city, created_at = order
-        current = datetime.strptime(created_at, "%Y-%m-%d %H:%M:%S")
-        user_type = user_lookup[user_id]["user_type"]
+    for idx, order in enumerate(orders, start=1):
+        order_id, user_id, _, order_status, amount, created_at_str = order
+        current = datetime.strptime(created_at_str, "%Y-%m-%d %H:%M:%S")
+        info = user_lookup[user_id]
+        platform, city, user_type = info["platform"], info["city"], info["user_type"]
         phase = phase_for_date(current)
         method = payment_method_for(platform)
         if method == "cod":
@@ -576,9 +588,9 @@ def generate_payments(orders, user_lookup):
 
         status, processing_time_ms, error_code = payment_outcome(current, platform, city, user_type, method)
 
+        # Align payment status with order status
         if order_status == "completed":
-            status = "success"
-            error_code = ""
+            status, error_code = "success", ""
         elif order_status == "failed" and status == "success" and method != "cod":
             status = weighted_choice(["failed", "timeout"], [72, 28])
             error_code = "UPI_CALLBACK_TIMEOUT" if status == "timeout" else "PAYMENT_PROVIDER_ERROR"
@@ -586,38 +598,49 @@ def generate_payments(orders, user_lookup):
             status = weighted_choice(["failed", "timeout"], [55, 45])
             error_code = "TRANSACTION_REVERSED" if status == "failed" else "UPI_COLLECT_PENDING"
 
+        # NO user_id/platform/city — get via orders → users
         rows.append([
-            f"PAY{index:06d}",
-            order_id,
-            user_id,
-            method,
-            provider,
-            status,
-            amount,
-            processing_time_ms,
-            error_code,
-            platform,
-            city,
-            created_at,
+            f"PAY{idx:06d}", order_id, method, provider, status,
+            amount, processing_time_ms, error_code, created_at_str,
         ])
 
     write_table(
         "payments",
-        ["payment_id", "order_id", "user_id", "method", "provider", "status", "amount", "processing_time_ms", "error_code", "platform", "city", "created_at"],
+        ["payment_id", "order_id", "method", "provider", "status", "amount", "processing_time_ms", "error_code", "created_at"],
         rows,
     )
     return rows
 
 
+# ---------------------------------------------------------------------------
+# 7. drivers — PK: driver_id
+# ---------------------------------------------------------------------------
+def generate_drivers(n: int = 150):
+    print("Generating drivers...")
+    rows = []
+    statuses = ["available", "on_delivery", "offline"]
+    for i in range(1, n + 1):
+        first = random.choice(PROFILE["first_names"])
+        last = random.choice(PROFILE["last_names"])
+        city = weighted_choice(CITIES, CITY_WEIGHTS)
+        rows.append([f"D{i:04d}", f"{first} {last}", gen_phone(), city, weighted_choice(statuses, [44, 34, 22])])
+    write_table("drivers", ["driver_id", "name", "phone", "city", "availability_status"], rows)
+    return rows
+
+
+# ---------------------------------------------------------------------------
+# 8. funnel_events — PK: event_id — FK: user_id
+#    Keeps platform (session-level device context). No city — JOIN to users.
+# ---------------------------------------------------------------------------
 def session_target_for(current: datetime) -> int:
-    base = {7: 250, 8: 260, 9: 270, 10: 285, 11: 295, 12: 330, 1: 320, 2: 295, 3: 305}[current.month]
+    base = {10: 200, 11: 215, 12: 250, 1: 240, 2: 220, 3: 230}[current.month]
     if current.weekday() in (5, 6):
         base = int(base * 1.1)
-    if datetime(2024, 12, 26).date() <= current.date() <= datetime(2025, 1, 5).date():
-        base = int(base * 1.14)
+    if is_promo_period(current):
+        base = int(base * 1.20)
     if phase_for_date(current) == "trust_damage":
-        base = int(base * 0.94)
-    return max(160, int(jitter(base, 0.07)))
+        base = int(base * 0.91)
+    return max(130, int(jitter(base, 0.07)))
 
 
 def session_completion_prob(current: datetime, platform: str, city: str, user_type: str) -> float:
@@ -640,15 +663,17 @@ def session_completion_prob(current: datetime, platform: str, city: str, user_ty
             prob = 0.89
     elif phase == "trust_damage":
         prob = 0.91
+        # Hard problem: power/returning users browse less
         if user_type in {"returning", "power"} and platform == "android" and is_primary:
-            prob = 0.88
+            prob = 0.85
     return prob
 
 
-def generate_session_events(users, orders):
-    print("Generating sessions_events table...")
+def generate_funnel_events(users):
+    print("Generating funnel_events...")
     rows = []
-    users_by_platform = {platform: [user for user in users if user[5] == platform] for platform in PLATFORMS}
+    users_by_platform = {p: [u for u in users if u[7] == p] for p in PLATFORMS}
+    user_lookup = {u[0]: {"city": u[4], "user_type": u[8]} for u in users}
     event_id = 1
     session_id = 1
     current = START_DATE
@@ -657,14 +682,19 @@ def generate_session_events(users, orders):
     steps = ["app_open", "restaurant_view", "add_to_cart", "checkout_start", "payment_attempt", "order_complete"]
 
     while current.date() <= END_DATE.date():
-        session_count = session_target_for(current)
-        for _ in range(session_count):
+        count = session_target_for(current)
+        phase = phase_for_date(current)
+        for _ in range(count):
             platform_weights = PROFILE["platform_mix"][:]
-            if phase_for_date(current) == "trust_damage":
-                platform_weights = [18, 58, 24]
+            if phase == "trust_damage":
+                platform_weights = [18, 56, 26]
+
             platform = weighted_choice(PLATFORMS, platform_weights)
             user = random.choice(users_by_platform[platform])
-            user_id, city, user_type = user[0], user[6], user[7]
+            user_id = user[0]
+            city = user_lookup[user_id]["city"]
+            user_type = user_lookup[user_id]["user_type"]
+
             if platform == "ios":
                 device = random.choice(PROFILE["ios_devices"])
                 app_version = "8.4.1" if current < MIGRATION_DATE else "8.4.2"
@@ -678,61 +708,54 @@ def generate_session_events(users, orders):
             completion_prob = session_completion_prob(current, platform, city, user_type)
             probs = base_probs[:]
             probs[-1] = completion_prob
-            if phase_for_date(current) == "trust_damage" and platform == "android" and city_is_primary(city) and user_type in {"returning", "power"}:
-                probs[1] = 0.73
-                probs[2] = 0.67
+            # Hard problem: trust-damaged cohort browses less
+            if phase == "trust_damage" and platform == "android" and city_is_primary(city) and user_type in {"returning", "power"}:
+                probs[1] = 0.70  # restaurant_view: 70% vs 77% baseline
+                probs[2] = 0.63  # add_to_cart: 63% vs 72% baseline
 
             timestamp = datetime.combine(current.date(), datetime.min.time()) + timedelta(
                 hours=weighted_choice(list(range(24)), [1, 1, 1, 1, 1, 1, 2, 3, 4, 5, 6, 7, 9, 8, 7, 5, 4, 5, 8, 10, 9, 7, 4, 2]),
-                minutes=random.randint(0, 59),
-                seconds=random.randint(0, 59),
+                minutes=random.randint(0, 59), seconds=random.randint(0, 59),
             )
 
             for idx, step in enumerate(steps):
                 if idx > 0 and random.random() > probs[idx]:
                     break
                 timestamp += timedelta(seconds=random.randint(4, 55))
+                # NO city column — JOIN to users
                 rows.append([
-                    f"E{event_id:07d}",
-                    user_id,
-                    f"S{session_id:07d}",
-                    step,
-                    platform,
-                    city,
-                    device,
-                    app_version,
-                    timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+                    f"E{event_id:07d}", user_id, f"S{session_id:07d}", step,
+                    platform, device, app_version, timestamp.strftime("%Y-%m-%d %H:%M:%S"),
                 ])
                 event_id += 1
             session_id += 1
         current += timedelta(days=1)
 
     write_table(
-        "sessions_events",
-        ["event_id", "user_id", "session_id", "event_type", "platform", "city", "device", "app_version", "timestamp"],
+        "funnel_events",
+        ["event_id", "user_id", "session_id", "event_type", "platform", "device", "app_version", "timestamp"],
         rows,
     )
     return rows
 
 
-def generate_reviews(users, orders):
-    print("Generating reviews table...")
+# ---------------------------------------------------------------------------
+# 9. reviews — PK: review_id — FK: user_id, order_id — NO platform/city
+# ---------------------------------------------------------------------------
+def generate_reviews(orders):
+    print("Generating reviews...")
     rows = []
-
     orders_by_window = defaultdict(list)
     for order in orders:
-        order_dt = datetime.strptime(order[7], "%Y-%m-%d %H:%M:%S")
-        if order_dt < MIGRATION_DATE:
+        dt = datetime.strptime(order[5], "%Y-%m-%d %H:%M:%S")
+        if dt < MIGRATION_DATE:
             orders_by_window["pre"].append(order)
-        elif order_dt < HOTFIX_DATE:
+        elif dt < HOTFIX_DATE:
             orders_by_window["incident"].append(order)
-        elif order_dt < TRUST_DAMAGE_DATE:
+        elif dt < TRUST_DAMAGE_DATE:
             orders_by_window["partial"].append(order)
         else:
             orders_by_window["trust"].append(order)
-
-    def add_review(review_id: int, order, rating: int, text: str, created_at: datetime):
-        rows.append([f"REV{review_id:04d}", order[1], order[0], rating, text, order[5], order[6], created_at.strftime("%Y-%m-%d %H:%M:%S")])
 
     review_texts = {
         "pre": [
@@ -751,41 +774,50 @@ def generate_reviews(users, orders):
             (2, "The app asked me to retry UPI three times. Very frustrating."),
         ],
         "partial": [
-            (2, "UPI works sometimes now, but I still don’t trust whether the order will confirm."),
+            (2, "UPI works sometimes now, but I still don't trust whether the order will confirm."),
             (1, "Still seeing callback timeout after paying through UPI. Support says wait 24 hours."),
             (3, "Managed to order after a retry. Better than last week, but not fixed."),
             (4, "Card payment worked fine today, but UPI is still flaky for me."),
         ],
         "trust": [
-            (2, "Technical issue seems better, but I’ve started ordering less because I don’t trust the payment flow."),
+            (2, "Technical issue seems better, but I've started ordering less because I don't trust the payment flow."),
             (1, "Shifted most of my weekend orders to Swiggy after repeated UPI failures here."),
             (3, "App is faster now, but the earlier failed payments really damaged confidence."),
             (4, "Food quality is good, but ZaikaNow needs to win back trust after the January issues."),
+            (2, "I only use ZaikaNow for specific restaurants now. For daily orders I switched to competitors."),
+            (1, "Three failed payments in January and nobody proactively reached out. Lost a loyal customer."),
+            (3, "My family used to order dinner every night. Now it's maybe twice a week. Trust is broken."),
         ],
     }
 
     review_id = 1
     for window, entries in review_texts.items():
-        candidates = orders_by_window[window]
+        candidates = orders_by_window.get(window, [])
         if not candidates:
             continue
-        for rating, text in entries * 4:
+        repeats = 5 if window == "trust" else 4  # More trust-phase reviews
+        for rating, text in entries * repeats:
             order = random.choice(candidates)
-            order_dt = datetime.strptime(order[7], "%Y-%m-%d %H:%M:%S")
-            add_review(review_id, order, rating, text, order_dt + timedelta(hours=random.randint(1, 48)))
+            order_dt = datetime.strptime(order[5], "%Y-%m-%d %H:%M:%S")
+            created_at = order_dt + timedelta(hours=random.randint(1, 48))
+            # NO platform/city — JOIN to users via order → user
+            rows.append([f"REV{review_id:04d}", order[1], order[0], rating, text, created_at.strftime("%Y-%m-%d %H:%M:%S")])
             review_id += 1
 
-    rows.sort(key=lambda row: row[7])
-    write_table("reviews", ["review_id", "user_id", "order_id", "rating", "text", "platform", "city", "created_at"], rows)
+    rows.sort(key=lambda r: r[5])
+    write_table("reviews", ["review_id", "user_id", "order_id", "rating", "text", "created_at"], rows)
     return rows
 
 
+# ---------------------------------------------------------------------------
+# 10. support_tickets — PK: ticket_id — FK: user_id, order_id — NO platform/city
+# ---------------------------------------------------------------------------
 def generate_support_tickets(users, orders):
-    print("Generating support_tickets table...")
+    print("Generating support_tickets...")
     rows = []
     users_by_city = defaultdict(list)
-    for user in users:
-        users_by_city[user[6]].append(user)
+    for u in users:
+        users_by_city[u[4]].append(u)
 
     issue_templates = [
         ("payment", "upi_timeout", "UPI payment stayed on processing and then failed. I had already approved it in my bank app.", "critical"),
@@ -794,6 +826,9 @@ def generate_support_tickets(users, orders):
         ("payment", "callback_delay", "UPI callback took too long and the order status never updated.", "high"),
         ("delivery", "late_delivery", "Delivery was very late today even though the app showed it was nearby.", "medium"),
         ("promo", "coupon_issue", "Republic Day coupon did not apply on checkout.", "low"),
+        # Hard problem: trust concern tickets
+        ("account", "trust_concern", "I want to export my order history. Considering moving to another platform after repeated payment failures.", "medium"),
+        ("account", "trust_concern", "Can you confirm your refund policy? I had multiple failed payments in January and need assurance before ordering again.", "medium"),
     ]
 
     ticket_id = 1
@@ -807,62 +842,83 @@ def generate_support_tickets(users, orders):
         elif phase == "partial_recovery":
             volume = weighted_choice([1, 2, 3], [25, 50, 25])
         else:
-            volume = weighted_choice([1, 2], [65, 35])
+            volume = weighted_choice([1, 2], [55, 45])
 
         for _ in range(volume):
-            if phase in {"incident", "partial_recovery", "trust_damage"} and random.random() < 0.7:
+            if phase in {"incident", "partial_recovery"} and random.random() < 0.7:
                 city = weighted_choice(["bengaluru", "mumbai", "delhi_ncr"], [40, 35, 25])
                 platform = weighted_choice(["android", "ios", "web"], [60, 25, 15])
-                category, subcategory, description, priority = weighted_choice(
-                    issue_templates[:4],
-                    [34, 24, 20, 22],
-                )
+                category, subcategory, description, priority = weighted_choice(issue_templates[:4], [34, 24, 20, 22])
+            elif phase == "trust_damage" and random.random() < 0.35:
+                # Hard problem: trust concern tickets appear in trust phase
+                city = weighted_choice(["bengaluru", "mumbai", "delhi_ncr"], [40, 35, 25])
+                platform = "android"
+                category, subcategory, description, priority = random.choice(issue_templates[6:8])
             else:
                 city = weighted_choice(CITIES, CITY_WEIGHTS)
                 platform = weighted_choice(PLATFORMS, PROFILE["platform_mix"])
-                category, subcategory, description, priority = random.choice(issue_templates)
+                category, subcategory, description, priority = random.choice(issue_templates[:6])
 
-            possible_users = [user for user in users_by_city[city] if user[5] == platform] or users_by_city[city]
+            possible_users = [u for u in users_by_city[city] if u[7] == platform] or users_by_city[city]
             user = random.choice(possible_users)
             created_at = current + timedelta(hours=random.randint(8, 22), minutes=random.randint(0, 59))
             status = weighted_choice(["open", "in_progress", "resolved"], [45, 35, 20]) if phase != "baseline" else weighted_choice(["resolved", "in_progress"], [80, 20])
             resolved_at = ""
             if status == "resolved":
                 resolved_at = (created_at + timedelta(hours=random.randint(4, 36))).strftime("%Y-%m-%d %H:%M:%S")
+
+            # Find a matching order for this user if possible
+            user_orders = [o for o in orders if o[1] == user[0]]
+            order_id = random.choice(user_orders)[0] if user_orders else ""
+
+            # NO platform/city — JOIN to users
             rows.append([
-                f"TK{ticket_id:04d}",
-                user[0],
-                category,
-                subcategory,
-                description,
-                platform,
-                city,
-                priority,
-                status,
-                created_at.strftime("%Y-%m-%d %H:%M:%S"),
-                resolved_at,
+                f"TK{ticket_id:04d}", user[0], order_id, category, subcategory, description,
+                priority, status, created_at.strftime("%Y-%m-%d %H:%M:%S"), resolved_at,
             ])
             ticket_id += 1
         current += timedelta(days=3)
 
-    rows.sort(key=lambda row: row[9])
+    rows.sort(key=lambda r: r[8])
     write_table(
         "support_tickets",
-        ["ticket_id", "user_id", "category", "subcategory", "description", "platform", "city", "priority", "status", "created_at", "resolved_at"],
+        ["ticket_id", "user_id", "order_id", "category", "subcategory", "description", "priority", "status", "created_at", "resolved_at"],
         rows,
     )
     return rows
 
 
+# ---------------------------------------------------------------------------
+# 11. ux_changelog — platform stays (per-change, not per-user)
+# ---------------------------------------------------------------------------
+def generate_ux_changelog():
+    print("Generating ux_changelog...")
+    rows = [
+        ["2024-12-18", "feature", "Added cuisine shortcuts for breakfast and biryani", "homepage", "all"],
+        ["2024-12-27", "feature", "New Year offer rail on the home feed", "homepage", "all"],
+        ["2025-01-05", "ab_test", "Testing a denser cart summary layout", "cart", "all"],
+        ["2025-01-08", "feature", "Updated restaurant ranking for repeat orders", "search", "all"],
+        ["2025-01-10", "feature", "New payment success animation after confirmation", "checkout", "all"],
+        ["2025-01-12", "bugfix", "Fixed checkout button alignment on smaller Android screens", "checkout", "android"],
+        ["2025-01-20", "ab_test", "Testing simplified checkout review sheet", "checkout", "all"],
+        ["2025-01-25", "feature", "Republic Day specials collection", "homepage", "all"],
+        ["2025-02-08", "bugfix", "Improved failed-payment copy on the review screen", "checkout", "all"],
+    ]
+    write_table("ux_changelog", ["date", "change_type", "description", "affected_area", "platform"], rows)
+
+
+# ---------------------------------------------------------------------------
+# 12. usability_study.md — Document
+# ---------------------------------------------------------------------------
 def generate_usability_study():
     print("Generating usability_study.md...")
     content = """# ZaikaNow Checkout & UPI Reliability Study
 
 ## Study Overview
 
-**Type:** Moderated usability study  
-**Participants:** n=24  
-**Date:** January 22-28, 2025  
+**Type:** Moderated usability study
+**Participants:** n=24
+**Date:** January 22-28, 2025
 **Objective:** Evaluate ordering and payment completion across Android, iOS, and web in major Indian metros
 
 Participants were active ZaikaNow customers from Bengaluru, Mumbai, Delhi NCR, Hyderabad, and Pune. Most participants were frequent UPI users, reflecting the app's normal payment mix.
@@ -927,24 +983,11 @@ Participants were active ZaikaNow customers from Bengaluru, Mumbai, Delhi NCR, H
     write_md("usability_study.md", content)
 
 
-def generate_ux_changelog():
-    print("Generating ux_changelog table...")
-    rows = [
-        ["2024-12-18", "feature", "Added cuisine shortcuts for breakfast and biryani", "homepage", "all"],
-        ["2024-12-27", "feature", "New Year offer rail on the home feed", "homepage", "all"],
-        ["2025-01-05", "ab_test", "Testing a denser cart summary layout", "cart", "all"],
-        ["2025-01-08", "feature", "Updated restaurant ranking for repeat orders", "search", "all"],
-        ["2025-01-10", "feature", "New payment success animation after confirmation", "checkout", "all"],
-        ["2025-01-12", "bugfix", "Fixed checkout button alignment on smaller Android screens", "checkout", "android"],
-        ["2025-01-20", "ab_test", "Testing simplified checkout review sheet", "checkout", "all"],
-        ["2025-01-25", "feature", "Republic Day specials collection", "homepage", "all"],
-        ["2025-02-08", "bugfix", "Improved failed-payment copy on the review screen", "checkout", "all"],
-    ]
-    write_table("ux_changelog", ["date", "change_type", "description", "affected_area", "platform"], rows)
-
-
+# ---------------------------------------------------------------------------
+# 13. deployments — PK: deploy_id
+# ---------------------------------------------------------------------------
 def generate_deployments():
-    print("Generating deployments table...")
+    print("Generating deployments...")
     rows = [
         ["DEP001", "catalog_service", "Expanded breakfast collections for metro cities", "ananya.iyer", "2024-12-18 09:45:00", "yes", gen_commit_hash()],
         ["DEP002", "notification_service", "New Year reminder campaign scheduler", "rahul.sharma", "2024-12-28 13:10:00", "yes", gen_commit_hash()],
@@ -959,8 +1002,11 @@ def generate_deployments():
     write_table("deployments", ["deploy_id", "service", "description", "author", "timestamp", "rollback_available", "commit_hash"], rows)
 
 
+# ---------------------------------------------------------------------------
+# 14. service_metrics — PK: (date, service)
+# ---------------------------------------------------------------------------
 def generate_service_metrics():
-    print("Generating service_metrics table...")
+    print("Generating service_metrics...")
     services = {
         "payment_service": {"p50": 135, "p95": 310, "p99": 470, "error_rate": 0.4, "requests": 21000},
         "checkout_service": {"p50": 95, "p95": 210, "p99": 340, "error_rate": 0.12, "requests": 26000},
@@ -973,12 +1019,9 @@ def generate_service_metrics():
     rows = []
     current = START_DATE
     while current.date() <= END_DATE.date():
-        for service, baseline in services.items():
-            p50 = baseline["p50"]
-            p95 = baseline["p95"]
-            p99 = baseline["p99"]
-            error_rate = baseline["error_rate"]
-            requests = baseline["requests"]
+        for service, bl in services.items():
+            p50, p95, p99 = bl["p50"], bl["p95"], bl["p99"]
+            error_rate, requests = bl["error_rate"], bl["requests"]
             phase = phase_for_date(current)
 
             if service == "payment_service" and phase == "incident":
@@ -989,18 +1032,11 @@ def generate_service_metrics():
                 error_rate = 3.4 + min(days_after, 12) * 0.18
                 requests = 18500
             elif service == "payment_service" and phase == "partial_recovery":
-                p50 = 210
-                p95 = 680
-                p99 = 1800
-                error_rate = 1.9
-                requests = 19000
+                p50, p95, p99, error_rate, requests = 210, 680, 1800, 1.9, 19000
             elif service == "payment_service" and phase == "trust_damage":
-                p50 = 165
-                p95 = 470
-                p99 = 920
-                error_rate = 0.9
-                requests = 18200
+                p50, p95, p99, error_rate, requests = 165, 470, 920, 0.9, 18200
 
+            # Red herrings
             if service == "search_service" and current.date() == datetime(2025, 1, 8).date():
                 p99 = 860
             if service == "notification_service" and datetime(2025, 1, 20).date() <= current.date() <= datetime(2025, 1, 22).date():
@@ -1016,13 +1052,32 @@ def generate_service_metrics():
             rows.append([current.strftime("%Y-%m-%d"), service, p50, p95, p99, error_rate, error_count, requests])
         current += timedelta(days=1)
 
-    write_table(
-        "service_metrics",
-        ["date", "service", "p50_ms", "p95_ms", "p99_ms", "error_rate_pct", "error_count", "request_count"],
-        rows,
-    )
+    write_table("service_metrics", ["date", "service", "p50_ms", "p95_ms", "p99_ms", "error_rate_pct", "error_count", "request_count"], rows)
 
 
+# ---------------------------------------------------------------------------
+# 15. payment_errors_summary — PK: (date, error_code, payment_method)
+# ---------------------------------------------------------------------------
+def generate_payment_errors_summary(payments, orders, user_lookup):
+    print("Generating payment_errors_summary...")
+    summary = defaultdict(int)
+    order_map = {o[0]: o[1] for o in orders}  # order_id -> user_id
+    for payment in payments:
+        status = payment[4]
+        error_code = payment[7]
+        if status == "success" or not error_code:
+            continue
+        date = payment[8][:10]
+        method = payment[2]
+        summary[(date, error_code, method)] += 1
+
+    rows = [[date, error_code, count, method] for (date, error_code, method), count in sorted(summary.items())]
+    write_table("payment_errors_summary", ["date", "error_code", "count", "payment_method"], rows)
+
+
+# ---------------------------------------------------------------------------
+# 16. system_architecture.md — Document
+# ---------------------------------------------------------------------------
 def generate_system_architecture():
     print("Generating system_architecture.md...")
     content = """# ZaikaNow System Architecture
@@ -1079,49 +1134,37 @@ The platform runs on a microservice architecture in AWS ap-south-1 (Mumbai), wit
     write_md("system_architecture.md", content)
 
 
-def generate_payment_errors_summary(payments):
-    print("Generating payment_errors_summary table...")
-    summary = defaultdict(int)
-    for payment in payments:
-        status = payment[5]
-        error_code = payment[8]
-        if status == "success" or not error_code:
-            continue
-        date = payment[11][:10]
-        platform = payment[9]
-        summary[(date, error_code, platform)] += 1
-
-    rows = [[date, error_code, count, platform] for (date, error_code, platform), count in sorted(summary.items())]
-    write_table("payment_errors_summary", ["date", "error_code", "count", "platform"], rows)
-
-
+# ===========================================================================
+# MAIN
+# ===========================================================================
 def main():
     global CONN
     print("=" * 60)
     print("ZaikaNow Scenario Data Generator")
-    print("Checkout Conversion Drop - RupeeFlow v3 Migration")
+    print("Checkout Conversion Drop — 3 Embedded Problems")
     print("=" * 60)
     print(f"Output database: {DB_PATH}")
+    print(f"Date range: {START_DATE.date()} to {END_DATE.date()}")
     print()
 
     CONN = reset_database()
 
     users = generate_users()
-    restaurants = generate_restaurants(users)
+    restaurants = generate_restaurants()
     _, restaurant_menu_map = generate_menu_items(restaurants)
     orders, user_lookup = generate_orders(users, restaurants, restaurant_menu_map)
     generate_order_items(orders, restaurant_menu_map)
     generate_drivers()
     payments = generate_payments(orders, user_lookup)
-    generate_session_events(users, orders)
-    generate_reviews(users, orders)
+    generate_funnel_events(users)
+    generate_reviews(orders)
     generate_support_tickets(users, orders)
     generate_usability_study()
     generate_ux_changelog()
     generate_deployments()
     generate_service_metrics()
     generate_system_architecture()
-    generate_payment_errors_summary(payments)
+    generate_payment_errors_summary(payments, orders, user_lookup)
 
     if CONN is not None:
         CONN.close()
