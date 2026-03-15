@@ -280,7 +280,7 @@ def get_query_history(session_id: str) -> list[dict[str, Any]]:
     _ensure_query_log_columns(conn)
     rows = conn.execute(
         """
-        SELECT id, agent, query_text, response_text, artifacts_json, citations_json, warnings_json, planner_json, timestamp
+        SELECT id, agent, query_text, response_text, artifacts_json, citations_json, warnings_json, planner_json, attempts_json, timestamp
         FROM query_logs
         WHERE session_id = ?
         ORDER BY timestamp, id
@@ -298,6 +298,7 @@ def get_query_history(session_id: str) -> list[dict[str, Any]]:
             "citations": json.loads(r["citations_json"] or "[]"),
             "warnings": json.loads(r["warnings_json"] or "[]"),
             "planner": json.loads(r["planner_json"] or "{}"),
+            "attempts": json.loads(r["attempts_json"] or "[]"),
             "timestamp": r["timestamp"],
         }
         for r in rows

@@ -15,6 +15,18 @@ Completed orders have dropped across key Indian metros since mid-January while c
 
 The RupeeFlow v3 payment migration (DEP004) on January 10, 2025 degraded UPI confirmation and callback handling. Android users in high-volume metros (Bengaluru, Mumbai, Delhi NCR) were hit hardest, causing payment failures, delayed confirmations, and order completion drops. A Feb 1 hotfix (DEP007) partially restored reliability, but behavioral trust damage persists among power and returning users who reduced ordering frequency.
 
+### Data Integrity Notes
+
+The dataset is fully reconciled — every cross-table relationship is consistent:
+
+- Every order's `total_amount` equals `SUM(menu_items.price × order_items.quantity)`
+- Every order's `session_id` exists in `funnel_events` (all sessions start with `app_open`)
+- Users, restaurants, and drivers are city-matched within each order
+- Reviews only exist for completed (delivered) orders
+- Support tickets are always created after their referenced order
+- Payment amounts match order totals; payment session_ids match order session_ids
+- Order items reference menu items from the correct restaurant
+
 ### Ideal Investigation Steps
 
 A strong candidate should follow this sequence, building each step on prior findings:
@@ -27,7 +39,7 @@ A strong candidate should follow this sequence, building each step on prior find
 
 **Step 2 — Identify the funnel break**
 - Agent: Analyst
-- Query: Checkout funnel breakdown (app_open → restaurant_view → add_to_cart → checkout_start → payment_attempt → order_complete) before and after Jan 10
+- Query: Checkout funnel breakdown (app_open → restaurant_view → add_to_cart → checkout_start → payment_attempt → order_complete) before and after Jan 10. Every session starts at app_open; orders are the subset that complete all 6 steps.
 - Expected finding: The largest break occurs at payment_attempt → order_complete
 - Key insight: This is a payment-step problem, not a traffic or browsing problem
 
@@ -52,7 +64,7 @@ A strong candidate should follow this sequence, building each step on prior find
 **Step 6 — Confirm the technical impact**
 - Agent: Engineering Lead
 - Query: Payment service latency and error rate trends
-- Expected finding: p99 latency spikes from 490ms to 2,685ms on Jan 10, sustained 2,900--3,700ms. Error codes shift to UPI_CALLBACK_TIMEOUT, BANK_TIMEOUT, PAYMENT_PROVIDER_ERROR
+- Expected finding: p99 latency spikes from 503ms to 2,519ms on Jan 10, sustained 2,900--6,700ms through Jan. Error codes shift to UPI_CALLBACK_TIMEOUT, BANK_TIMEOUT, PAYMENT_PROVIDER_ERROR
 - Key insight: Technical confirmation of the RupeeFlow v3 regression
 
 **Step 7 — Validate with user feedback**
@@ -70,13 +82,13 @@ A strong candidate should follow this sequence, building each step on prior find
 **Step 9 — Assess post-fix recovery** (strong candidate)
 - Agent: Analyst
 - Query: Order volumes and completion rates in Feb (post-hotfix DEP007 on Feb 1)
-- Expected finding: Technical metrics improve (completion 82.5%) but total orders drop 24.5% (9,175 → 6,928). Platform mix shifts: Android 61.9% → 58.1%, web 19.2% → 23.4%
+- Expected finding: Technical metrics improve but total orders drop 19.0% (8,194 → 6,634). Platform mix shifts: Android 58.9% → 56.9%, web 21.6% → 24.3%
 - Key insight: Technical fix worked but business impact persists — users migrating away
 
 **Step 10 — Identify trust damage** (strong candidate)
 - Agent: UX Researcher
 - Query: Review sentiment from Feb onward
-- Expected finding: 29 trust-damage reviews: "shifted to Swiggy," "ordering less," "don't trust the payment flow," "family orders twice a week instead of daily"
+- Expected finding: 52 trust-damage reviews: "shifted to Swiggy," "ordering less," "don't trust the payment flow," "family orders twice a week instead of daily"
 - Key insight: Behavioral trust damage persists beyond the technical fix
 
 ### Red Herrings
@@ -94,15 +106,15 @@ A strong candidate should follow this sequence, building each step on prior find
 | Signal | Value |
 |--------|-------|
 | DEP004 deployment | 2025-01-10 06:00, "Migrated to RupeeFlow v3 payment orchestration" |
-| Pre-incident completion | 88.5% (Jan 8--9) |
-| Post-incident completion | 74.8% (Jan 10--15) |
-| Failed orders per day | ~11 (baseline) → ~37 (post Jan 10), 3.3x increase |
-| p99 latency | 490ms → 2,685ms on Jan 10, sustained 2,900--3,700ms |
+| Pre-incident completion | 84.6% (Jan 8--9) |
+| Post-incident completion | 73.6% (Jan 10--15) |
+| Failed orders per day | ~12 (baseline) → ~30 (post Jan 10), 2.4x increase |
+| p99 latency | 503ms → 2,519ms on Jan 10, sustained 2,900--6,700ms |
 | Usability task completion | 93% (Nov) → 61% (Jan), Android 49% |
-| Post-hotfix order volume | Jan: 9,175 → Feb: 6,928 (24.5% drop) |
-| Android share shift | 61.9% (Jan) → 58.1% (Feb) |
-| Web share shift | 19.2% (Jan) → 23.4% (Feb) |
-| Trust damage reviews | 29 reviews (Feb--Mar) with competitor-switching themes |
+| Post-hotfix order volume | Jan: 8,194 → Feb: 6,634 (19.0% drop) |
+| Android share shift | 58.9% (Jan) → 56.9% (Feb) |
+| Web share shift | 21.6% (Jan) → 24.3% (Feb) |
+| Trust damage reviews | 52 reviews (Feb--Mar) with competitor-switching themes |
 
 ### Ideal Recovery Plan
 
@@ -204,6 +216,8 @@ ZaikaNow is exploring a premium membership tier — "ZaikaNow Gold" — to boost
 ## Database Reference
 
 Both scenarios share `scenarios/checkout_conversion_drop/tables/scenario.db`:
-- ~49,252 orders across Oct 2024 -- Mar 2025
+
+- ~48,754 orders across Oct 2024 -- Mar 2025
 - 15 tables: users, orders, payments, restaurants, menu_items, order_items, drivers, funnel_events, reviews, support_tickets, ux_changelog, deployments, service_metrics, error_log, documents
 - MECE schema: city, platform, user_type in users table only; other tables reference via FK
+- Fully reconciled: order totals = item prices × quantities, city-matched users/restaurants/drivers, all orders linked to funnel sessions, reviews only on completed orders, tickets created after their order

@@ -326,29 +326,62 @@ function LineChart({ artifact }: { artifact: Extract<Artifact, { kind: "chart" }
   const width = isDense ? 600 : 360;
   const height = isDense ? 220 : 180;
   const padLeft = 48;
-  const padRight = 16;
   const padTop = 12;
   const padBottom = 38;
+
+  // Detect if dual axis is needed (scales differ by >10x)
+  const seriesMaxes = artifact.series.map((s) => Math.max(...s.values, 1));
+  const overallMax = Math.max(...seriesMaxes);
+  const overallMin = Math.min(...seriesMaxes);
+  const needsDualAxis = artifact.series.length >= 2 && overallMax / Math.max(overallMin, 1) > 10;
+
+  const padRight = needsDualAxis ? 52 : 16;
   const plotWidth = width - padLeft - padRight;
   const plotHeight = height - padTop - padBottom;
 
-  const flattened = artifact.series.flatMap((item) => item.values);
-  const rawMax = Math.max(...flattened, 1);
-  const rawMin = Math.min(...flattened, 0);
-  const min = rawMin > 0 ? 0 : rawMin;
-  const max = rawMax;
-  const range = max - min || 1;
+  // Split series into primary (left) and secondary (right) axis groups
+  const threshold = overallMax / 5;
+  const primaryIndices = needsDualAxis
+    ? artifact.series.map((_, i) => i).filter((i) => seriesMaxes[i] >= threshold)
+    : artifact.series.map((_, i) => i);
+  const secondaryIndices = needsDualAxis
+    ? artifact.series.map((_, i) => i).filter((i) => seriesMaxes[i] < threshold)
+    : [];
 
-  const yTicks = Array.from({ length: 5 }, (_, index) => min + ((4 - index) / 4) * range);
+  // Compute axis scales
+  function axisScale(indices: number[]) {
+    const vals = indices.flatMap((i) => artifact.series[i].values);
+    const rMax = Math.max(...vals, 1);
+    const rMin = Math.min(...vals, 0);
+    const mn = rMin > 0 ? 0 : rMin;
+    const rng = rMax - mn || 1;
+    return { min: mn, max: rMax, range: rng };
+  }
+
+  const primary = axisScale(primaryIndices);
+  const secondary = secondaryIndices.length > 0 ? axisScale(secondaryIndices) : primary;
+
+  const primaryTicks = Array.from({ length: 5 }, (_, i) => primary.min + ((4 - i) / 4) * primary.range);
+  const secondaryTicks = needsDualAxis
+    ? Array.from({ length: 5 }, (_, i) => secondary.min + ((4 - i) / 4) * secondary.range)
+    : [];
+
   const maxTicks = isDense ? 8 : 6;
   const labelTickIndices = getLabelTickIndices(artifact.labels.length, maxTicks);
   const strokeWidth = isDense ? 1.5 : 2.5;
 
+  function yForValue(value: number, scale: { min: number; range: number }) {
+    return padTop + (1 - (value - scale.min) / scale.range) * plotHeight;
+  }
+
+  const secondarySet = new Set(secondaryIndices);
+
   return (
     <div className="space-y-3">
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full" style={{ aspectRatio: `${width}/${height}` }}>
-        {yTicks.map((tickValue, index) => {
-          const y = padTop + (1 - (tickValue - min) / range) * plotHeight;
+        {/* Primary (left) Y-axis */}
+        {primaryTicks.map((tickValue, index) => {
+          const y = yForValue(tickValue, primary);
           return (
             <g key={`y-tick-${index}`}>
               <line
@@ -370,6 +403,22 @@ function LineChart({ artifact }: { artifact: Extract<Artifact, { kind: "chart" }
             </g>
           );
         })}
+        {/* Secondary (right) Y-axis */}
+        {secondaryTicks.map((tickValue, index) => {
+          const y = yForValue(tickValue, secondary);
+          return (
+            <g key={`y-tick-r-${index}`}>
+              <text
+                x={width - padRight + 6}
+                y={y + 4}
+                textAnchor="start"
+                className="fill-slate-400 text-[10px]"
+              >
+                {formatChartAxisValue(tickValue, artifact.unit)}
+              </text>
+            </g>
+          );
+        })}
         <line
           x1={padLeft}
           x2={width - padRight}
@@ -379,9 +428,10 @@ function LineChart({ artifact }: { artifact: Extract<Artifact, { kind: "chart" }
           className="text-slate-800/20 dark:text-white/10"
         />
         {artifact.series.map((series, seriesIndex) => {
+          const scale = secondarySet.has(seriesIndex) ? secondary : primary;
           const points = series.values.map((value, index) => {
             const x = padLeft + (index / Math.max(artifact.labels.length - 1, 1)) * plotWidth;
-            const y = padTop + (1 - (value - min) / range) * plotHeight;
+            const y = yForValue(value, scale);
             return `${x},${y}`;
           });
           return (
@@ -393,6 +443,7 @@ function LineChart({ artifact }: { artifact: Extract<Artifact, { kind: "chart" }
               strokeLinecap="round"
               strokeLinejoin="round"
               strokeOpacity={0.85}
+              strokeDasharray={secondarySet.has(seriesIndex) ? "6 3" : undefined}
               points={points.join(" ")}
             />
           );
@@ -425,7 +476,7 @@ function LineChart({ artifact }: { artifact: Extract<Artifact, { kind: "chart" }
         {artifact.series.map((series, index) => (
           <div key={series.name} className="flex items-center gap-2 text-[11px] text-slate-500">
             <span className="size-2 rounded-full" style={{ backgroundColor: palette[index % palette.length] }} />
-            <span>{series.name}</span>
+            <span>{series.name}{needsDualAxis ? (secondarySet.has(index) ? " (right)" : " (left)") : ""}</span>
           </div>
         ))}
       </div>

@@ -422,25 +422,42 @@ def order_status_probs(current: datetime, platform: str, city: str, user_type: s
     return fail_rate, cancel_rate
 
 
-def generate_orders(users, restaurants, restaurant_menu_map, drivers, completed_sessions):
-    """Generate orders from completed funnel sessions + extra quick-reorder orders."""
+def generate_orders(users, restaurants, restaurant_menu_map, menu_items, drivers, completed_sessions):
+    """Generate one order per completed funnel session, with order_items inline.
+
+    Every order maps 1:1 to a completed session. total_amount is computed from
+    actual menu_item prices × quantities (order_items generated here).
+    """
     print("Generating orders...")
     user_lookup = {u[0]: {"platform": u[7], "city": u[4], "user_type": u[8]} for u in users}
-    users_by_platform = {p: [u for u in users if u[7] == p] for p in PLATFORMS}
-    restaurant_ids = [r[0] for r in restaurants]
+    # Price lookup: item_id → price
+    item_price = {row[0]: float(row[4]) for row in menu_items}
+    # Build city → restaurant_ids lookup (user orders from same city)
+    restaurants_by_city = defaultdict(list)
+    for r in restaurants:
+        restaurants_by_city[r[3]].append(r[0])
     # Build city → driver_ids lookup for driver assignment
     drivers_by_city = defaultdict(list)
-    all_driver_ids = [d[0] for d in drivers]
     for d in drivers:
         drivers_by_city[d[3]].append(d[0])
 
-    # Group completed sessions by date
-    sessions_by_date = defaultdict(list)
+    order_rows = []
+    oi_rows = []
+    order_id = 1
+    oi_id = 1
     for s in completed_sessions:
-        sessions_by_date[s["date"].date()].append(s)
-
-    def _make_order(order_id, user_id, city, user_type, platform, session_id, created_at, current):
+        user_id = s["user_id"]
+        city = s["city"]
+        user_type = s["user_type"]
+        platform = s["platform"]
+        current = s["date"]
         phase = phase_for_date(current)
+
+        # Hard problem: trust-damaged cohort drops 20% of orders
+        if phase == "trust_damage" and user_type in {"returning", "power"} and platform == "android" and city_is_primary(city):
+            if random.random() < 0.20:
+                continue
+
         fail_rate, cancel_rate = order_status_probs(current, platform, city, user_type)
         r = random.random()
         if r < fail_rate:
@@ -450,99 +467,40 @@ def generate_orders(users, restaurants, restaurant_menu_map, drivers, completed_
         else:
             status = "completed"
 
-        restaurant_id = random.choice(restaurant_ids)
-        total_amount = round(random.uniform(149, 849), 2)
-        # Assign driver for completed orders
+        # Restaurant must be in the same city as the user
+        restaurant_id = random.choice(restaurants_by_city[city])
+        # Assign driver from same city for completed orders
         if status == "completed":
-            city_drivers = drivers_by_city.get(city, [])
-            driver_id = random.choice(city_drivers) if city_drivers else random.choice(all_driver_ids)
+            driver_id = random.choice(drivers_by_city[city])
         else:
             driver_id = ""
-        return [
-            f"ORD{order_id:06d}", user_id, restaurant_id, driver_id, session_id,
-            status, f"{total_amount:.2f}", created_at.strftime("%Y-%m-%d %H:%M:%S"),
-        ]
 
-    rows = []
-    order_id = 1
-    qr_counter = 1  # Quick-reorder session counter
-    current = START_DATE
-    while current.date() <= END_DATE.date():
-        target = daily_order_target(current)
-        phase = phase_for_date(current)
-
-        # Pass 1: Orders from completed funnel sessions (shared session_id)
-        day_sessions = sessions_by_date.get(current.date(), [])
-        for s in day_sessions:
-            user_id = s["user_id"]
-            city = s["city"]
-            user_type = s["user_type"]
-            platform = s["platform"]
-
-            # Hard problem: trust-damaged cohort drops 20% of orders
-            if phase == "trust_damage" and user_type in {"returning", "power"} and platform == "android" and city_is_primary(city):
-                if random.random() < 0.20:
-                    continue
-
-            row = _make_order(order_id, user_id, city, user_type, platform, s["session_id"], s["timestamp"], current)
-            rows.append(row)
-            order_id += 1
-
-        # Pass 2: Fill gap with quick-reorder orders (independent session_ids)
-        funnel_count = len([r for r in rows if r[7][:10] == current.date().isoformat()])  # orders already created today
-        gap = max(0, target - funnel_count)
-        for _ in range(gap):
-            platform_weights = PROFILE["platform_mix"][:]
-            if phase == "trust_damage":
-                platform_weights = [18, 56, 26]
-            platform = weighted_choice(PLATFORMS, platform_weights)
-            user = random.choice(users_by_platform[platform])
-            user_id = user[0]
-            city = user_lookup[user_id]["city"]
-            user_type = user_lookup[user_id]["user_type"]
-
-            if phase == "trust_damage" and user_type in {"returning", "power"} and platform == "android" and city_is_primary(city):
-                if random.random() < 0.20:
-                    continue
-
-            session_id = f"QR{qr_counter:07d}"
-            qr_counter += 1
-            hour = weighted_choice(
-                list(range(24)),
-                [1, 1, 1, 1, 1, 1, 2, 3, 4, 5, 6, 7, 9, 8, 7, 5, 4, 5, 8, 10, 9, 7, 4, 2],
-            )
-            created_at = datetime.combine(current.date(), datetime.min.time()) + timedelta(
-                hours=hour, minutes=random.randint(0, 59), seconds=random.randint(0, 59),
-            )
-            row = _make_order(order_id, user_id, city, user_type, platform, session_id, created_at, current)
-            rows.append(row)
-            order_id += 1
-        current += timedelta(days=1)
-
-    write_table("orders", ["order_id", "user_id", "restaurant_id", "driver_id", "session_id", "order_status", "total_amount", "created_at"], rows)
-    return rows, user_lookup
-
-
-# ---------------------------------------------------------------------------
-# 5. order_items — PK: order_item_id — FK: order_id, item_id
-# ---------------------------------------------------------------------------
-def generate_order_items(orders, restaurant_menu_map):
-    print("Generating order_items...")
-    rows = []
-    oi_id = 1
-    for order in orders:
-        restaurant_id = order[2]
+        # Generate order_items and compute total_amount from actual prices
+        order_id_str = f"ORD{order_id:06d}"
         menu_ids = restaurant_menu_map.get(restaurant_id, [])
-        if not menu_ids:
-            continue
-        k = weighted_choice([1, 2, 3, 4], [15, 42, 31, 12])
-        selected_items = random.sample(menu_ids, k=min(k, len(menu_ids)))
+        if menu_ids:
+            k = weighted_choice([1, 2, 3, 4], [15, 42, 31, 12])
+            selected_items = random.sample(menu_ids, k=min(k, len(menu_ids)))
+        else:
+            selected_items = []
+        total_amount = 0.0
         for item_id in selected_items:
             quantity = weighted_choice([1, 2, 3], [72, 23, 5])
-            rows.append([f"OI{oi_id:06d}", order[0], item_id, quantity])
+            total_amount += item_price[item_id] * quantity
+            oi_rows.append([f"OI{oi_id:06d}", order_id_str, item_id, quantity])
             oi_id += 1
-    write_table("order_items", ["order_item_id", "order_id", "item_id", "quantity"], rows)
-    return rows
+
+        order_rows.append([
+            order_id_str, user_id, restaurant_id, driver_id, s["session_id"],
+            status, f"{total_amount:.2f}", s["timestamp"].strftime("%Y-%m-%d %H:%M:%S"),
+        ])
+        order_id += 1
+
+    write_table("orders", ["order_id", "user_id", "restaurant_id", "driver_id", "session_id", "order_status", "total_amount", "created_at"], order_rows)
+    print(f"Generating order_items...")
+    write_table("order_items", ["order_item_id", "order_id", "item_id", "quantity"], oi_rows)
+    return order_rows, oi_rows, user_lookup
+
 
 
 # ---------------------------------------------------------------------------
@@ -682,14 +640,14 @@ def generate_drivers(n: int = 150):
 #    Keeps platform (session-level device context). No city — JOIN to users.
 # ---------------------------------------------------------------------------
 def session_target_for(current: datetime) -> int:
-    base = {10: 200, 11: 215, 12: 250, 1: 240, 2: 220, 3: 230}[current.month]
+    base = {10: 830, 11: 890, 12: 980, 1: 940, 2: 870, 3: 910}[current.month]
     if current.weekday() in (5, 6):
         base = int(base * 1.1)
     if is_promo_period(current):
         base = int(base * 1.20)
     if phase_for_date(current) == "trust_damage":
         base = int(base * 0.91)
-    return max(130, int(jitter(base, 0.07)))
+    return max(600, int(jitter(base, 0.07)))
 
 
 def session_completion_prob(current: datetime, platform: str, city: str, user_type: str) -> float:
@@ -719,7 +677,12 @@ def session_completion_prob(current: datetime, platform: str, city: str, user_ty
 
 
 def generate_funnel_events(users):
-    """Generate funnel events and return completed sessions for order linkage."""
+    """Generate funnel events and return completed sessions for order linkage.
+
+    Every app open = new session. All sessions start at app_open and follow the
+    same 6-step funnel. ~30% of sessions complete all steps (order_complete).
+    Orders are a subset of sessions — one order per completed session.
+    """
     print("Generating funnel_events...")
     rows = []
     completed_sessions = []  # Sessions that reached order_complete
@@ -733,13 +696,13 @@ def generate_funnel_events(users):
     steps = ["app_open", "restaurant_view", "add_to_cart", "checkout_start", "payment_attempt", "order_complete"]
 
     while current.date() <= END_DATE.date():
-        count = session_target_for(current)
         phase = phase_for_date(current)
-        for _ in range(count):
-            platform_weights = PROFILE["platform_mix"][:]
-            if phase == "trust_damage":
-                platform_weights = [18, 56, 26]
+        platform_weights = PROFILE["platform_mix"][:]
+        if phase == "trust_damage":
+            platform_weights = [18, 56, 26]
 
+        count = session_target_for(current)
+        for _ in range(count):
             platform = weighted_choice(PLATFORMS, platform_weights)
             user = random.choice(users_by_platform[platform])
             user_id = user[0]
@@ -775,7 +738,6 @@ def generate_funnel_events(users):
                 if idx > 0 and random.random() > probs[idx]:
                     break
                 timestamp += timedelta(seconds=random.randint(4, 55))
-                # NO city column — JOIN to users
                 rows.append([
                     f"E{event_id:07d}", user_id, session_id_str, step,
                     platform, device, app_version, timestamp.strftime("%Y-%m-%d %H:%M:%S"),
@@ -796,6 +758,7 @@ def generate_funnel_events(users):
                 })
 
             session_id += 1
+
         current += timedelta(days=1)
 
     write_table(
@@ -868,7 +831,8 @@ def generate_reviews(orders):
 
     review_id = 1
     for window, entries in review_texts.items():
-        candidates = orders_by_window.get(window, [])
+        # Only completed orders can be reviewed (food was actually delivered)
+        candidates = [o for o in orders_by_window.get(window, []) if o[5] == "completed"]
         if not candidates:
             continue
         repeats = 5 if window == "trust" else 4  # More trust-phase reviews
@@ -950,8 +914,9 @@ def generate_support_tickets(users, orders):
             if status == "resolved":
                 resolved_at = (created_at + timedelta(hours=random.randint(4, 36))).strftime("%Y-%m-%d %H:%M:%S")
 
-            # Find a matching order for this user if possible
-            user_orders = [o for o in orders if o[1] == user[0]]
+            # Find a matching order for this user that was placed BEFORE this ticket
+            created_at_str = created_at.strftime("%Y-%m-%d %H:%M:%S")
+            user_orders = [o for o in orders if o[1] == user[0] and o[7] <= created_at_str]
             order_id = random.choice(user_orders)[0] if user_orders else ""
 
             # NO platform/city — JOIN to users
@@ -1280,11 +1245,10 @@ def main():
 
     users = generate_users()
     restaurants = generate_restaurants()
-    _, restaurant_menu_map = generate_menu_items(restaurants)
+    menu_items, restaurant_menu_map = generate_menu_items(restaurants)
     drivers = generate_drivers()
     _, completed_sessions = generate_funnel_events(users)
-    orders, user_lookup = generate_orders(users, restaurants, restaurant_menu_map, drivers, completed_sessions)
-    generate_order_items(orders, restaurant_menu_map)
+    orders, order_items, user_lookup = generate_orders(users, restaurants, restaurant_menu_map, menu_items, drivers, completed_sessions)
     payments = generate_payments(orders, user_lookup)
     generate_reviews(orders)
     generate_support_tickets(users, orders)

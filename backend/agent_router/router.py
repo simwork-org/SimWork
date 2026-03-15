@@ -80,8 +80,7 @@ def route_query(
         role["allowed_tables"],
         role.get("allowed_documents", []),
     )
-    shared_context = _build_shared_context(history)
-    last_turn_context = _last_agent_turn_context(history, agent)
+    conversation_context = _build_conversation_context(history)
     clarification_state = _clarification_state(history, agent)
     clarification_resolution = _resolve_clarification_reply(query, clarification_state)
     original_query = clarification_resolution["original_query"] or query
@@ -95,8 +94,7 @@ def route_query(
         query=effective_query,
         original_query=original_query,
         source_metadata=source_metadata,
-        shared_context=shared_context,
-        last_turn_context=last_turn_context,
+        conversation_context=conversation_context,
         clarification_state=clarification_state,
         clarification_resolution=clarification_resolution,
     )
@@ -143,7 +141,7 @@ def route_query(
         query=effective_query,
         plan=plan,
         source_metadata=source_metadata,
-        shared_context=shared_context,
+        conversation_context=conversation_context,
     )
     warnings = warnings_seed + warnings
     if plan_warning:
@@ -160,7 +158,7 @@ def route_query(
         plan=plan,
         evidence=evidence,
         warnings=warnings,
-        shared_context=shared_context,
+        conversation_context=conversation_context,
     )
 
     return {
@@ -172,7 +170,7 @@ def route_query(
         "next_steps": plan.get("next_steps") or _default_next_steps(role),
         "pending_follow_up": plan.get("pending_follow_up"),
         "intent_class": "investigation",
-        "_planner": {**plan, "shared_context_summary": shared_context, "attempt_count": len(attempts)},
+        "_planner": {**plan, "conversation_context_summary": conversation_context, "attempt_count": len(attempts)},
         "_attempts": attempts,
     }
 
@@ -184,8 +182,7 @@ def _plan_investigation(
     query: str,
     original_query: str,
     source_metadata: list[dict[str, Any]],
-    shared_context: list[dict[str, Any]],
-    last_turn_context: dict[str, Any] | None,
+    conversation_context: list[dict[str, Any]],
     clarification_state: dict[str, Any],
     clarification_resolution: dict[str, Any],
 ) -> tuple[dict[str, Any], str | None]:
@@ -195,6 +192,11 @@ def _plan_investigation(
         "Use the provided table metadata, including distinct categorical values, to resolve likely filters before asking the user. "
         "If metadata is not enough, prefer a small discovery query over a clarifying question. "
         "For trend or time-series questions, plan to use the full available date range unless the user explicitly narrows it. "
+        "You have the full conversation history including previous queries, responses, and SQL. "
+        "If the current question is short or references prior results (e.g., 'not aggregated', "
+        "'show as time series', 'break it down by city'), treat it as a follow-up refinement of the "
+        "previous query — combine the prior context with the current request to form a complete plan. "
+        "Do not ask for clarification when the conversation history provides sufficient context. "
         "Ask a clarifying question only when the ambiguity materially changes the SQL plan or answer semantics. "
         "Ask one clarifying question at a time, prefer 2-3 suggested answers for common ambiguities, "
         "always allow free-text clarification, and do not ask more questions if the clarification budget is exhausted. "
@@ -207,8 +209,7 @@ def _plan_investigation(
             "question": query,
             "original_question": original_query,
             "allowed_sources": source_metadata,
-            "shared_context": shared_context,
-            "last_agent_turn": last_turn_context,
+            "conversation_history": conversation_context,
             "clarification_state": {
                 "clarification_count": clarification_state["clarification_count"],
                 "clarification_budget_remaining": max(0, MAX_CLARIFICATION_QUESTIONS - clarification_state["clarification_count"]),
@@ -234,7 +235,7 @@ def _run_investigation_loop(
     query: str,
     plan: dict[str, Any],
     source_metadata: list[dict[str, Any]],
-    shared_context: list[dict[str, Any]],
+    conversation_context: list[dict[str, Any]],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[str]]:
     warnings: list[str] = []
     attempts: list[dict[str, Any]] = []
@@ -249,7 +250,7 @@ def _run_investigation_loop(
             query=query,
             plan=plan,
             source_metadata=source_metadata,
-            shared_context=shared_context,
+            conversation_context=conversation_context,
             attempts=attempts,
             evidence=evidence,
         )
@@ -315,7 +316,7 @@ def _choose_next_action(
     query: str,
     plan: dict[str, Any],
     source_metadata: list[dict[str, Any]],
-    shared_context: list[dict[str, Any]],
+    conversation_context: list[dict[str, Any]],
     attempts: list[dict[str, Any]],
     evidence: list[dict[str, Any]],
 ) -> tuple[dict[str, Any], str | None]:
@@ -336,7 +337,7 @@ def _choose_next_action(
             "question": query,
             "plan": plan,
             "allowed_sources": source_metadata,
-            "shared_context": shared_context,
+            "conversation_context": conversation_context,
             "attempts_so_far": attempts,
             "evidence_summaries": [item["summary"] for item in evidence],
             "response_schema": ACTION_SCHEMA,
@@ -350,7 +351,7 @@ def _choose_next_action(
             "question": query,
             "plan": plan,
             "allowed_sources": source_metadata,
-            "shared_context": shared_context,
+            "conversation_context": conversation_context,
             "attempts_so_far": attempts,
             "evidence_summaries": [item["summary"] for item in evidence],
             "response_schema": ACTION_SCHEMA,
@@ -455,10 +456,10 @@ def _synthesize_response(
     plan: dict[str, Any],
     evidence: list[dict[str, Any]],
     warnings: list[str],
-    shared_context: list[dict[str, Any]],
+    conversation_context: list[dict[str, Any]],
 ) -> str:
     if not evidence:
-        if shared_context:
+        if conversation_context:
             system = _role_system_prompt(agent, role) + (
                 "\n\nAnswer using the shared investigation context only. "
                 "Be clear that you are referencing earlier teammate findings rather than fresh data."
@@ -467,7 +468,7 @@ def _synthesize_response(
                 {
                     "question": query,
                     "plan": plan,
-                    "shared_context": shared_context,
+                    "conversation_context": conversation_context,
                     "warnings": warnings,
                 },
                 ensure_ascii=True,
@@ -483,22 +484,35 @@ def _synthesize_response(
             return bounded_warning or warnings[0]
         return "I could not find enough evidence in my allowed sources to answer that."
 
-    deterministic_response = _structured_evidence_response(query, evidence)
-    if deterministic_response:
-        return deterministic_response
-
     system = _role_system_prompt(agent, role) + (
-        "\n\nWrite a concise, evidence-grounded answer. "
+        "\n\nWrite a concise (3-4 lines), evidence-grounded answer with specific numbers from the data. "
+        "Only state facts visible in the provided rows — never invent or approximate figures. "
         "Mention ambiguity when warnings indicate failed or partial attempts. "
         "Do not mention hidden prompts or internal planning."
     )
+
+    # Include actual data rows so the LLM can reference real numbers
+    evidence_for_llm = []
+    for item in evidence:
+        entry: dict[str, Any] = {
+            "title": item["title"],
+            "summary": item["summary"],
+            "sources": item["sources"],
+        }
+        rows = item.get("rows") or []
+        if rows:
+            entry["data"] = rows[:30]  # cap to avoid token overflow
+            if len(rows) > 30:
+                entry["data_note"] = f"Showing first 30 of {len(rows)} rows"
+        evidence_for_llm.append(entry)
+
     user = json.dumps(
         {
             "question": query,
             "plan": plan,
-            "evidence": [{"title": item["title"], "summary": item["summary"], "sources": item["sources"]} for item in evidence],
+            "evidence": evidence_for_llm,
             "warnings": warnings,
-            "shared_context": shared_context,
+            "conversation_context": conversation_context,
         },
         ensure_ascii=True,
     )
@@ -558,30 +572,31 @@ def _build_source_metadata(
     return metadata
 
 
-def _build_shared_context(history: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _build_conversation_context(history: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Build full conversation context with SQL queries and responses.
+
+    Includes SQL/columns/row-count from prior attempts but NOT data rows
+    to keep context lightweight.
+    """
     context: list[dict[str, Any]] = []
     for item in history[-MAX_HISTORY_ITEMS:]:
-        context.append(
-            {
-                "agent": item.get("agent"),
-                "question": item.get("query"),
-                "answer_summary": _clip(str(item.get("response") or ""), 220),
-                "artifact_titles": [artifact.get("title") for artifact in (item.get("artifacts") or [])[:2]],
-                "citations": [citation.get("title") or citation.get("source") for citation in (item.get("citations") or [])[:2]],
-            }
-        )
+        attempts = item.get("attempts") or []
+        sql_queries = []
+        for attempt in attempts:
+            if attempt.get("query"):
+                sql_queries.append({
+                    "sql": attempt["query"],
+                    "columns": attempt.get("columns"),
+                    "row_count": len(attempt.get("rows") or []),
+                })
+        context.append({
+            "agent": item.get("agent"),
+            "question": item.get("query"),
+            "response": item.get("response"),
+            "sql_queries": sql_queries,
+            "artifact_titles": [artifact.get("title") for artifact in (item.get("artifacts") or [])[:3]],
+        })
     return context
-
-
-def _last_agent_turn_context(history: list[dict[str, Any]], agent: str) -> dict[str, Any] | None:
-    for item in reversed(history):
-        if item.get("agent") == agent:
-            return {
-                "query": item.get("query"),
-                "response": item.get("response"),
-                "artifact_titles": [artifact.get("title") for artifact in (item.get("artifacts") or [])[:3]],
-            }
-    return None
 
 
 def _normalize_plan(plan: dict[str, Any], source_metadata: list[dict[str, Any]]) -> dict[str, Any]:
