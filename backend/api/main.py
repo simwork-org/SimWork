@@ -15,11 +15,11 @@ if _env_path.exists():
         _key, _, _val = _line.partition("=")
         os.environ.setdefault(_key.strip(), _val.strip())
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI  # noqa: E402
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 
-from api.routes import router
-from investigation_logger.logger import clear_all_session_data, init_db
+from api.routes import router  # noqa: E402
+from investigation_logger.logger import clear_all_session_data, init_db  # noqa: E402
 
 app = FastAPI(
     title="SimWork API",

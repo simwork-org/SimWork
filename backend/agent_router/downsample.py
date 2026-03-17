@@ -8,7 +8,7 @@ or stride thinning (for categorical axes).
 from __future__ import annotations
 
 import math
-from datetime import date, timedelta
+from datetime import date
 from typing import Any
 
 DEFAULT_MAX_POINTS = 200

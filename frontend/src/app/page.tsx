@@ -9,7 +9,6 @@ import {
   getChallenges,
   startSession,
   type Scenario,
-  type Challenge,
 } from "@/lib/api";
 
 const TYPE_BADGES: Record<string, { label: string; color: string }> = {

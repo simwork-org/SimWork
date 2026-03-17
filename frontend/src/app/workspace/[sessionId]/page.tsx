@@ -20,7 +20,6 @@ import {
   type Citation,
   type PendingFollowUp,
   type QueryLogDetail,
-  type QueryHistoryItem,
   type ReferencePanel,
   type SavedEvidence,
   type ScenarioDetail,
@@ -568,11 +567,12 @@ function QueryLogModal({
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setLoading(true);
+    let cancelled = false;
     getQueryLogDetail(sessionId, queryLogId)
-      .then(setDetail)
+      .then((data) => { if (!cancelled) setDetail(data); })
       .catch(console.error)
-      .finally(() => setLoading(false));
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, [sessionId, queryLogId]);
 
   return (
@@ -803,7 +803,6 @@ function InlineArtifactCard({
   artifact,
   citation,
   queryLogId,
-  agent,
   savedEvidenceMap,
   draftAnnotation,
   onDraftChange,
@@ -812,7 +811,6 @@ function InlineArtifactCard({
   artifact: Artifact;
   citation: Citation | undefined;
   queryLogId?: number;
-  agent: string;
   savedEvidenceMap: Map<string, SavedEvidence>;
   draftAnnotation: string;
   onDraftChange: (value: string) => void;
@@ -873,12 +871,16 @@ function SavedEvidenceCard({
   onUpdate: (annotation: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
-  const [annotation, setAnnotation] = useState(item.annotation || "");
+  const derivedAnnotation = item.annotation || "";
+  const [annotation, setAnnotation] = useState(derivedAnnotation);
   const agentInfo = AGENTS.find((agent) => agent.id === item.agent);
 
-  useEffect(() => {
-    setAnnotation(item.annotation || "");
-  }, [item.annotation]);
+  // Sync annotation from props without using setState in an effect
+  const [prevAnnotation, setPrevAnnotation] = useState(derivedAnnotation);
+  if (derivedAnnotation !== prevAnnotation) {
+    setPrevAnnotation(derivedAnnotation);
+    setAnnotation(derivedAnnotation);
+  }
 
   return (
     <div className="bg-slate-50 dark:bg-slate-800/30 rounded-xl border border-slate-200 dark:border-slate-700/50 p-4">
@@ -1057,8 +1059,6 @@ export default function WorkspacePage() {
   const currentSuggestions = currentPendingFollowUp?.choices?.length
     ? currentPendingFollowUp.choices
     : (currentAgentGuidance?.suggestions?.length ? currentAgentGuidance.suggestions : (QUICK_SUGGESTIONS[selectedAgent] || []));
-  const queryCount = useMemo(() => messages.filter((item) => item.role === "user").length, [messages]);
-
   const sendQuery = useCallback(async (query: string, inputMode: "typed" | "suggestion" = "typed") => {
     if (!query.trim() || isQuerying) return;
     const now = new Date().toISOString();
@@ -1326,7 +1326,6 @@ export default function WorkspacePage() {
                           artifact={artifact}
                           citation={citation}
                           queryLogId={message.queryLogId}
-                          agent={message.agent || "analyst"}
                           savedEvidenceMap={savedEvidenceMap}
                           draftAnnotation={saveDrafts[key] || ""}
                           onDraftChange={(value) => setSaveDrafts((prev) => ({ ...prev, [key]: value }))}

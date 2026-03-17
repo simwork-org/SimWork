@@ -384,18 +384,6 @@ def _choose_next_action(
         "If you already have enough evidence, return action=finish. "
         "Return JSON only."
     )
-    user = json.dumps(
-        {
-            "question": query,
-            "plan": plan,
-            "allowed_sources": source_metadata,
-            "conversation_context": conversation_context,
-            "attempts_so_far": attempts,
-            "evidence_summaries": [item["summary"] for item in evidence],
-            "response_schema": ACTION_SCHEMA,
-        },
-        ensure_ascii=True,
-    )
     action, error = _chat_json(
         llm=llm,
         system=system,
