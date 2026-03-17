@@ -8,7 +8,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-DB_PATH = Path(__file__).resolve().parent.parent / "simwork.db"
+import os
+
+DB_PATH = Path(os.environ.get("SIMWORK_DB_PATH", Path(__file__).resolve().parent.parent / "simwork.db"))
 
 
 def _get_conn() -> sqlite3.Connection:

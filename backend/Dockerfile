@@ -5,18 +5,16 @@ WORKDIR /app
 # Install uv
 RUN pip install uv
 
-# Copy dependency file
-COPY pyproject.toml .
-
-# Install dependencies
+# Copy dependency file and install
+COPY pyproject.toml uv.lock ./
 RUN uv pip install --system -e .
 
-# Copy source code
+# Copy backend source
 COPY . .
 
-# Copy scenarios
-COPY ../scenarios /app/scenarios
+# Copy scenarios (mounted or built from root context)
+# For Railway: scenarios are included via root build context or volume
 
 EXPOSE 8000
 
-CMD ["uvicorn", "backend.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]

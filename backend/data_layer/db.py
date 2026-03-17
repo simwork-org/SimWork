@@ -7,7 +7,9 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
-SCENARIOS_DIR = Path(__file__).resolve().parent.parent.parent / "scenarios"
+import os
+
+SCENARIOS_DIR = Path(os.environ.get("SIMWORK_SCENARIOS_DIR", Path(__file__).resolve().parent.parent.parent / "scenarios"))
 
 # Cache open connections (one per scenario)
 _connections: dict[str, sqlite3.Connection] = {}

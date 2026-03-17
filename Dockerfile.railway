@@ -1,0 +1,27 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Install uv
+RUN pip install uv
+
+# Copy and install dependencies
+COPY backend/pyproject.toml backend/uv.lock ./
+RUN uv pip install --system -e .
+
+# Copy backend source
+COPY backend/ ./
+
+# Copy scenario data
+COPY scenarios/ ./scenarios/
+
+# Create data directory for persistent volume
+RUN mkdir -p /data
+
+# Default DB path points to persistent volume
+ENV SIMWORK_DB_PATH=/data/simwork.db
+ENV SIMWORK_SCENARIOS_DIR=/app/scenarios
+
+EXPOSE 8000
+
+CMD uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000}
