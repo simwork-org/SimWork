@@ -24,7 +24,7 @@ from investigation_logger.logger import clear_all_session_data, init_db  # noqa:
 app = FastAPI(
     title="SimWork API",
     description="Simulation platform for evaluating investigation and decision-making skills",
-    version="0.1.0",
+    version="1.0.0",
 )
 
 # CORS

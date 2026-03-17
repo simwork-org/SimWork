@@ -1,0 +1,7 @@
+step,previous_period,current_period
+app_open,1.00,1.00
+restaurant_view,0.78,0.76
+add_to_cart,0.46,0.41
+checkout,0.27,0.22
+payment,0.22,0.14
+order_success,0.21,0.13

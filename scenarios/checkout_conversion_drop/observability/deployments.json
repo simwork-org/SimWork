@@ -1,0 +1,12 @@
+[
+  {
+    "date": "2026-02-20",
+    "service": "search_service",
+    "change": "ranking cache optimization"
+  },
+  {
+    "date": "2026-02-24",
+    "service": "payment_service",
+    "change": "new payment gateway integration"
+  }
+]

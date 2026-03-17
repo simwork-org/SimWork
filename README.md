@@ -1,53 +1,120 @@
 # SimWork
 
-**SimWork** is a platform that simulates real work environments to evaluate how people investigate problems, make decisions, and execute solutions.
+SimWork is a simulation platform for evaluating how candidates investigate ambiguous product problems, use evidence, collaborate with AI teammates, and communicate decisions.
 
-Instead of answering theoretical questions, candidates are placed inside **realistic work scenarios** where they must collaborate with **AI teammates** (analyst, developer, UX researcher, etc.) to diagnose problems and propose solutions.
+The current repository ships a production-ready `v1.0.0` baseline with:
 
-The goal is to evaluate **how people actually work**, not just how they answer interview questions.
+- a FastAPI backend for scenario loading, session orchestration, evidence logging, scoring, and health checks
+- a Next.js frontend for investigation, evidence board, final submission, and review flows
+- scenario data and evaluation logic for the current PM simulation experience
+- minimum CI plus deployment configuration for Vercel and Railway
 
----
+## Repository Structure
 
-# Why SimWork
+```text
+backend/            FastAPI application, routing, scoring, persistence, tests
+frontend/           Next.js application
+scenarios/          Scenario data and configuration
+docs/releases/      Versioned release notes
+CHANGELOG.md        Durable change history
+RELEASING.md        Release process
+.local/docs/        Ignored local planning, research, and reference material
+```
 
-Traditional hiring processes rely on:
+## Documentation Policy
 
-- theoretical interview questions
-- case studies
-- subjective evaluation
+- `README.md` is the current shared project overview.
+- `CHANGELOG.md` is the canonical version history.
+- `RELEASING.md` defines the release process.
+- `docs/releases/` contains one release note per shipped version.
+- `.local/docs/` is for local-only planning, research, PRDs, notes, and reference files that should not be committed.
 
-These methods often fail to measure **real problem-solving ability in a work environment**.
+## Local Setup
 
-SimWork changes this by creating **interactive simulations of real work situations**.
+1. Copy the backend environment template.
 
-Candidates must:
+```bash
+cp backend/.env.example backend/.env
+```
 
-- investigate product metrics
-- ask the right questions
-- collaborate with team members
-- form hypotheses
-- propose solutions
+2. Review the frontend environment template.
 
-This reveals **how they think and operate in real scenarios**.
+```bash
+cp frontend/.env.example frontend/.env.local
+```
 
----
+3. Install backend dependencies.
 
-# Core Idea
+```bash
+cd backend
+uv sync
+cd ..
+```
 
-Each simulation places the candidate inside a **realistic product problem**.
+4. Install frontend dependencies.
 
-Example scenario:
+```bash
+cd frontend
+npm install
+cd ..
+```
 
-> Weekly orders have dropped by 18% over the past month.
+5. Start the backend.
 
-The candidate must investigate the issue by interacting with **AI teammates**.
+```bash
+make backend
+```
 
-Available roles may include:
+6. Start the frontend in a second terminal.
 
-- Data Analyst
-- UX Researcher
-- Developer
+```bash
+cd frontend
+npm run dev
+```
 
-Each AI teammate provides **partial information**, mimicking real-world knowledge distribution inside teams.
+Frontend: `http://localhost:3000`
+Backend API: `http://localhost:8000/api/v1`
+Backend health: `http://localhost:8000/health`
 
-The candidate must combine signals from different sources to identify the **root cause**.
+## Environment Variables
+
+Backend variables are documented in `backend/.env.example`, including:
+
+- `LLM_PROVIDER`
+- `LLM_MODEL`
+- provider API keys
+- `DATABASE_URL`
+- `CORS_ORIGINS`
+
+Frontend variables are documented in `frontend/.env.example`, including:
+
+- `NEXT_PUBLIC_API_URL`
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `NEXTAUTH_SECRET`
+- `NEXTAUTH_URL`
+
+## Verification
+
+Backend:
+
+```bash
+cd backend
+uv run ruff check .
+uv run pytest tests/ -v
+```
+
+Frontend:
+
+```bash
+cd frontend
+npm run lint
+npm run build
+```
+
+## Deployment
+
+- Frontend deploys from `main` via Vercel.
+- Backend deploys from `main` via Railway.
+- Railway health checks target `/health`.
+- GitHub Actions gate pull requests to `develop` and `main`.

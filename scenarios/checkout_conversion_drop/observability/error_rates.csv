@@ -1,0 +1,4 @@
+service,error_rate
+payment_service,3.2
+checkout_service,0.4
+search_service,0.2
