@@ -1,16 +1,235 @@
 {
   "scenario_id": "checkout_conversion_drop",
   "title": "Checkout Conversion Drop",
-  "difficulty": "medium",
+  "scenario_type": "diagnostic",
+  "icon": "trending_down",
+  "difficulty": "intermediate",
   "industry": "food_delivery",
-  "product": "FoodDash",
-  "problem_statement": "Weekly orders have dropped by 18% over the past month. Investigate the issue and propose a recovery plan.",
-  "root_cause": "payment_service_latency",
+  "product": "ZaikaNow",
+  "problem_statement": "Completed orders have dropped across key Indian metros since mid-January while competitors hold steady. Leadership needs a data-backed root cause and a recovery plan.",
+  "time_limit_minutes": 30,
+  "available_agents": ["analyst", "ux_researcher", "engineering_lead"],
+  "problems": [
+    {
+      "id": "order_drop_investigation",
+      "title": "Order Drop Investigation",
+      "challenge_title": "The Order Drop",
+      "challenge_prompt": "Completed orders have dropped across key Indian metros since mid-January. Competitors are holding steady. Find what's causing the decline and propose a recovery plan.",
+      "challenge_problem_statement": "ZaikaNow, an India-native food delivery marketplace, has seen a significant drop in completed orders starting mid-January across Bengaluru, Mumbai, and Delhi NCR. Leadership is concerned — major competitors aren't showing the same decline. Your job is to investigate the root cause using data from analytics, engineering, and user research, then propose an actionable recovery plan.",
+      "root_cause": "The RupeeFlow v3 payment migration on January 10, 2025 degraded UPI confirmation and callback handling. Android users in high-volume metros were hit hardest, causing payment failures, delayed confirmations, and order completion drops. A Feb 1 hotfix partially restored reliability, but trust damage persists among power and returning users who reduced ordering frequency.",
+      "key_evidence": [
+        "Funnel break at payment_attempt to order_complete starting Jan 10",
+        "UPI is the most affected payment method; Android + primary metros worst segment",
+        "DEP004: Migrated to RupeeFlow v3 on Jan 10",
+        "Payment service p99 latency spikes from 490ms to 2685ms on Jan 10",
+        "Error codes shift to UPI_CALLBACK_TIMEOUT, BANK_TIMEOUT, PAYMENT_PROVIDER_ERROR",
+        "Support tickets dominated by upi_timeout and callback_delay categories",
+        "Usability study: task completion dropped from 93% to 61%",
+        "Post-hotfix (Feb 1): technical metrics improve but order volumes remain depressed",
+        "Reviews show trust damage: users ordering less, shifting to competitors",
+        "Platform mix shifts: Android share drops, web share rises"
+      ],
+      "red_herrings_to_reject": [
+        "New Year promo normalization (resolves by Jan 7, 3-day gap before payment failures start Jan 10)",
+        "Search service p99 spike (Jan 8, resolves immediately, unrelated to checkout)",
+        "Republic Day promo (late Jan, merchandizing not payments)",
+        "Notification service errors (Jan 20-22, communication channel, not payment flow)",
+        "Checkout success animation (Jan 10, cosmetic change, insufficient scale)"
+      ],
+      "tables_involved": ["users", "orders", "payments", "funnel_events", "deployments", "service_metrics", "payment_errors_summary", "support_tickets", "reviews", "ux_changelog"],
+      "agents_required": ["analyst", "engineering_lead", "ux_researcher"]
+    }
+  ],
+  "data_model": {
+    "tables_directory": "tables/",
+    "schema_notes": "MECE design: city, platform, and user_type live in the users table only. Other tables reference users via FK (user_id). To analyze orders by city or platform, JOIN orders to users.",
+    "agent_capability_profiles": {
+      "analyst": {
+        "role_name": "Data Analyst",
+        "persona": "You are Priya, a pragmatic senior data analyst. You investigate trends, cohorts, customer behavior, payments, funnels, and business performance with SQL and careful evidence synthesis.",
+        "skills": [
+          "Trend analysis",
+          "Funnel analysis",
+          "Customer and cohort analysis",
+          "Payment-method analysis",
+          "Multi-table business joins",
+          "Segment comparison"
+        ],
+        "supported_intents": [
+          "reference", "dataset_summary", "schema_question",
+          "investigation", "comparison", "trend_analysis", "root_cause_analysis"
+        ],
+        "supported_operations": [
+          "lookup_rows", "rank_rows", "aggregate_breakdown", "aggregate_timeseries",
+          "compute_funnel", "summarize_source_profile", "summarize_date_span",
+          "compare_segments", "summarize_metric_delta"
+        ],
+        "preferred_artifact_kinds": ["metric", "chart", "table"],
+        "board_eligibility_rules": {
+          "default_intents": ["investigation", "comparison", "trend_analysis", "root_cause_analysis"],
+          "inline_only_intents": ["reference", "dataset_summary", "schema_question"]
+        },
+        "follow_up_styles": ["trend drill-downs", "segment comparisons", "date-range clarifications"]
+      },
+      "ux_researcher": {
+        "role_name": "UX Researcher",
+        "persona": "You are Kavya, a UX researcher focused on user pain points, behavioral friction, support signals, review themes, and product experience gaps.",
+        "skills": [
+          "Support and review theme extraction",
+          "Complaint analysis",
+          "Usability evidence synthesis",
+          "Qualitative pattern finding",
+          "UX change review",
+          "Representative quote selection"
+        ],
+        "supported_intents": [
+          "reference", "dataset_summary", "schema_question",
+          "investigation", "comparison", "quote_lookup", "root_cause_analysis"
+        ],
+        "supported_operations": [
+          "read_document_excerpt", "lookup_rows", "aggregate_breakdown",
+          "summarize_source_profile", "extract_feedback_themes",
+          "select_representative_quotes", "count_issue_mentions", "summarize_ux_change_impact"
+        ],
+        "preferred_artifact_kinds": ["table"],
+        "board_eligibility_rules": {
+          "default_intents": ["investigation", "comparison", "quote_lookup", "root_cause_analysis"],
+          "inline_only_intents": ["reference", "dataset_summary", "schema_question"]
+        },
+        "follow_up_styles": ["theme drill-downs", "quote requests", "UX change correlation"]
+      },
+      "engineering_lead": {
+        "role_name": "Engineering Lead",
+        "persona": "You are Rohan, an engineering lead who investigates incidents, regressions, deployments, service health, error patterns, and rollout risk using operational data.",
+        "skills": [
+          "Incident investigation",
+          "Deployment correlation",
+          "Service regression analysis",
+          "Latency and error analysis",
+          "Operational trend review",
+          "Technical root-cause synthesis"
+        ],
+        "supported_intents": [
+          "reference", "dataset_summary", "schema_question",
+          "investigation", "comparison", "incident_timeline",
+          "root_cause_analysis", "trend_analysis"
+        ],
+        "supported_operations": [
+          "lookup_rows", "aggregate_breakdown", "aggregate_timeseries",
+          "summarize_source_profile", "build_incident_timeline",
+          "correlate_deployments_with_metrics", "summarize_error_shift",
+          "compare_pre_post_rollout"
+        ],
+        "preferred_artifact_kinds": ["chart", "table", "metric"],
+        "board_eligibility_rules": {
+          "default_intents": ["investigation", "comparison", "incident_timeline", "root_cause_analysis", "trend_analysis"],
+          "inline_only_intents": ["reference", "dataset_summary", "schema_question"]
+        },
+        "follow_up_styles": ["timeline review", "metric correlation", "error-code breakdowns"]
+      }
+    },
+    "agent_data_access": {
+      "analyst": {
+        "tables": ["users", "orders", "order_items", "payments", "restaurants", "menu_items", "drivers", "funnel_events"],
+        "documents": [],
+        "access_type": "aggregated_views",
+        "description": "Business metrics, funnels, payment method analysis, cohort segmentation. JOIN orders to users for city/platform/user_type dimensions."
+      },
+      "ux_researcher": {
+        "tables": ["reviews", "support_tickets", "ux_changelog"],
+        "documents": ["usability_study.md"],
+        "access_type": "direct",
+        "description": "User feedback, support tickets, usability research, and product change history. JOIN reviews/tickets to users for city/platform context."
+      },
+      "engineering_lead": {
+        "tables": ["deployments", "service_metrics", "error_log"],
+        "documents": ["system_architecture.md"],
+        "access_type": "direct",
+        "description": "Deployment history, service health metrics, architecture notes, and detailed error log with per-error tracing across services."
+      }
+    }
+  },
   "expected_investigation_path": [
-    "orders_trend",
-    "checkout_funnel",
-    "segment_analysis",
-    "payment_service_latency",
-    "user_payment_feedback"
-  ]
+    "orders_trend_analysis",
+    "checkout_funnel_breakdown",
+    "city_platform_segment_analysis",
+    "payment_method_review",
+    "deployment_timeline_review",
+    "payment_service_latency_check",
+    "user_feedback_validation",
+    "cohort_retention_analysis",
+    "trust_damage_assessment"
+  ],
+  "expected_key_findings": [
+    "A sharp drop in completed orders begins Jan 10 affecting the payment step specifically",
+    "The largest funnel break occurs from payment attempt to order completion",
+    "Android users in Bengaluru, Mumbai, and Delhi NCR show the sharpest degradation",
+    "UPI is the most affected payment method and the main driver of failed confirmations",
+    "RupeeFlow v3 migration (DEP004) on January 10 aligns with the reliability decline",
+    "Payment service p99 latency spikes from 490ms to 2685ms after the migration",
+    "Payment error mix shifts toward UPI_CALLBACK_TIMEOUT, BANK_TIMEOUT, and PAYMENT_PROVIDER_ERROR",
+    "Support tickets and reviews confirm user-facing impact: UPI timeouts, money debited without confirmation",
+    "Feb 1 hotfix improves technical metrics but order frequency remains depressed",
+    "Power and returning users on Android show elevated cancellation and reduced ordering — trust damage persists"
+  ],
+  "red_herrings": [
+    {
+      "signal": "New Year campaign caused a visible demand spike from late December into early January",
+      "why_misleading": "Traffic normalization after the campaign is real, but it resolves by Jan 7 and does not explain the payment-step degradation that starts on January 10."
+    },
+    {
+      "signal": "Search service p99 latency spikes on January 8",
+      "why_misleading": "The spike is brief, resolves quickly, and does not line up with the checkout failure pattern."
+    },
+    {
+      "signal": "Republic Day promo and homepage rail changes launch in late January",
+      "why_misleading": "They can distract toward merchandizing explanations, but the reliability break is in payments."
+    },
+    {
+      "signal": "Notification service errors rise briefly on January 20-22",
+      "why_misleading": "This creates noise in communication flows, not in payment authorization or confirmation."
+    },
+    {
+      "signal": "Checkout success animation ships on January 10",
+      "why_misleading": "Adjacent in time but too minor to explain the scale and persistence of the payment degradation."
+    }
+  ],
+  "evaluation_rubric": {
+    "root_cause_identification": {
+      "weight": 0.35,
+      "levels": {
+        "excellent": "Identifies the RupeeFlow v3 migration as the root cause, explains the UPI confirmation regression, links it to Android-heavy metro impact, and recognizes that trust damage persists after the hotfix",
+        "good": "Identifies the payment gateway issue and the UPI/city pattern, but may not fully explain the post-fix trust damage",
+        "adequate": "Identifies the payment step as the main problem but does not isolate the migration or affected segment cleanly",
+        "poor": "Blames weaker factors such as promos ending, search ranking, or general traffic decline"
+      }
+    },
+    "investigation_methodology": {
+      "weight": 0.25,
+      "levels": {
+        "excellent": "Systematically queries all three agents, cross-references evidence across domains, rejects red herrings with reasoning, and builds a coherent timeline",
+        "good": "Uses multiple agents and connects the main technical and UX evidence",
+        "adequate": "Explores some evidence but misses important cross-functional links or timeline logic",
+        "poor": "Relies on a single agent or reaches a conclusion without sufficient evidence"
+      }
+    },
+    "solution_quality": {
+      "weight": 0.25,
+      "levels": {
+        "excellent": "Proposes immediate stabilization, payment-status UX fixes, customer trust recovery for affected cohorts, and monitoring for repeat-order recovery",
+        "good": "Proposes strong technical remediation plus some customer recovery actions",
+        "adequate": "Suggests fixes for payment reliability but lacks user-trust or monitoring depth",
+        "poor": "Offers generic actions without prioritization or evidence linkage"
+      }
+    },
+    "communication": {
+      "weight": 0.15,
+      "levels": {
+        "excellent": "Frames the problem for leadership with business impact, affected segments, customer trust risk, and a clear recovery narrative",
+        "good": "Provides a clear summary with supporting evidence",
+        "adequate": "Explains the issue but with limited prioritization or synthesis",
+        "poor": "Communicates in a fragmented way or dumps disconnected observations"
+      }
+    }
+  }
 }

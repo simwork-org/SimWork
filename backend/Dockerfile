@@ -1,23 +1,22 @@
 FROM python:3.12-slim
 
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN pip install --no-cache-dir uv
-
 WORKDIR /app
 
-COPY pyproject.toml ./
-COPY README.md ./
-COPY backend ./backend
-COPY scenarios ./scenarios
+# Install uv
+RUN pip install uv
 
-RUN uv sync --no-dev
+# Copy dependency file
+COPY pyproject.toml .
+
+# Install dependencies
+RUN uv pip install --system -e .
+
+# Copy source code
+COPY . .
+
+# Copy scenarios
+COPY ../scenarios /app/scenarios
 
 EXPOSE 8000
 
-CMD ["uv", "run", "uvicorn", "backend.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "backend.api.main:app", "--host", "0.0.0.0", "--port", "8000"]

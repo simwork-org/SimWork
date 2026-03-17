@@ -1,0 +1,203 @@
+{
+  "scenario_id": "premium_membership_launch",
+  "title": "Premium Membership Launch",
+  "scenario_type": "strategic",
+  "icon": "loyalty",
+  "difficulty": "intermediate",
+  "industry": "food_delivery",
+  "product": "ZaikaNow",
+  "problem_statement": "ZaikaNow is exploring a premium membership tier — 'ZaikaNow Gold' — to boost retention and revenue among high-value customers. Analyze the customer base, ordering patterns, and satisfaction signals to design the membership offering.",
+  "time_limit_minutes": 30,
+  "available_agents": ["analyst", "ux_researcher", "engineering_lead"],
+  "problems": [
+    {
+      "id": "gold_membership_design",
+      "title": "ZaikaNow Gold Membership Design",
+      "challenge_title": "Design ZaikaNow Gold",
+      "challenge_prompt": "ZaikaNow wants to launch a premium loyalty tier to retain high-value users and grow revenue. Analyze customer segments, ordering patterns, payment behavior, and user satisfaction to design the membership offering and identify the right target audience.",
+      "challenge_problem_statement": "ZaikaNow, an India-native food delivery marketplace, is considering launching 'ZaikaNow Gold' — a premium membership tier. Using 6 months of customer, order, payment, review, and operational data, segment the customer base, identify the highest-value users, understand their needs and pain points, and design a membership offering with clear target audience, feature set, pricing rationale, and launch strategy.",
+      "root_cause": "N/A — this is a strategic scenario. The ideal output is a well-segmented membership design backed by data analysis.",
+      "key_evidence": [
+        "Power users (top segment) have significantly higher ordering frequency and ARPU than casual/new users",
+        "Returning and power users on Android in primary metros represent the highest-value cohort",
+        "UPI is the dominant payment method among high-frequency orderers — premium checkout reliability is a key value proposition",
+        "Reviews from power/returning users mention specific restaurant loyalty and delivery speed expectations",
+        "Support tickets from high-value users focus on payment reliability and order accuracy — premium SLA opportunities",
+        "Platform distribution shows Android dominance — mobile-first membership experience is essential",
+        "City concentration: Bengaluru, Mumbai, Delhi NCR account for the majority of high-value orders"
+      ],
+      "tables_involved": ["users", "orders", "order_items", "payments", "restaurants", "reviews", "support_tickets", "funnel_events"],
+      "agents_required": ["analyst", "ux_researcher", "engineering_lead"]
+    }
+  ],
+  "data_model": {
+    "tables_directory": "tables/",
+    "schema_notes": "MECE design: city, platform, and user_type live in the users table only. Other tables reference users via FK (user_id). To analyze orders by city or platform, JOIN orders to users.",
+    "agent_capability_profiles": {
+      "analyst": {
+        "role_name": "Data Analyst",
+        "persona": "You are Priya, a pragmatic senior data analyst. You analyze customer segments, ordering patterns, revenue cohorts, payment preferences, and business metrics to inform product strategy.",
+        "skills": [
+          "Customer segmentation",
+          "Revenue and ARPU analysis",
+          "Cohort analysis",
+          "Ordering frequency patterns",
+          "Payment-method analysis",
+          "Segment comparison"
+        ],
+        "supported_intents": [
+          "reference", "dataset_summary", "schema_question",
+          "investigation", "comparison", "trend_analysis", "root_cause_analysis"
+        ],
+        "supported_operations": [
+          "lookup_rows", "rank_rows", "aggregate_breakdown", "aggregate_timeseries",
+          "compute_funnel", "summarize_source_profile", "summarize_date_span",
+          "compare_segments", "summarize_metric_delta"
+        ],
+        "preferred_artifact_kinds": ["metric", "chart", "table"],
+        "board_eligibility_rules": {
+          "default_intents": ["investigation", "comparison", "trend_analysis", "root_cause_analysis"],
+          "inline_only_intents": ["reference", "dataset_summary", "schema_question"]
+        },
+        "follow_up_styles": ["segment drill-downs", "cohort comparisons", "revenue breakdowns"]
+      },
+      "ux_researcher": {
+        "role_name": "UX Researcher",
+        "persona": "You are Kavya, a UX researcher focused on customer satisfaction, review themes, support pain points, and feature opportunity gaps that inform product decisions.",
+        "skills": [
+          "Review theme extraction",
+          "Customer satisfaction analysis",
+          "Pain point identification",
+          "Feature opportunity mapping",
+          "Qualitative pattern finding",
+          "Representative quote selection"
+        ],
+        "supported_intents": [
+          "reference", "dataset_summary", "schema_question",
+          "investigation", "comparison", "quote_lookup", "root_cause_analysis"
+        ],
+        "supported_operations": [
+          "read_document_excerpt", "lookup_rows", "aggregate_breakdown",
+          "summarize_source_profile", "extract_feedback_themes",
+          "select_representative_quotes", "count_issue_mentions", "summarize_ux_change_impact"
+        ],
+        "preferred_artifact_kinds": ["table"],
+        "board_eligibility_rules": {
+          "default_intents": ["investigation", "comparison", "quote_lookup", "root_cause_analysis"],
+          "inline_only_intents": ["reference", "dataset_summary", "schema_question"]
+        },
+        "follow_up_styles": ["theme drill-downs", "quote requests", "satisfaction analysis"]
+      },
+      "engineering_lead": {
+        "role_name": "Engineering Lead",
+        "persona": "You are Rohan, an engineering lead who provides platform reliability data, service health metrics, and infrastructure context to inform product SLA commitments and technical feasibility.",
+        "skills": [
+          "Service reliability analysis",
+          "Platform performance assessment",
+          "Latency and error analysis",
+          "Infrastructure capacity review",
+          "Operational trend review",
+          "Technical feasibility assessment"
+        ],
+        "supported_intents": [
+          "reference", "dataset_summary", "schema_question",
+          "investigation", "comparison", "incident_timeline",
+          "root_cause_analysis", "trend_analysis"
+        ],
+        "supported_operations": [
+          "lookup_rows", "aggregate_breakdown", "aggregate_timeseries",
+          "summarize_source_profile", "build_incident_timeline",
+          "correlate_deployments_with_metrics", "summarize_error_shift",
+          "compare_pre_post_rollout"
+        ],
+        "preferred_artifact_kinds": ["chart", "table", "metric"],
+        "board_eligibility_rules": {
+          "default_intents": ["investigation", "comparison", "incident_timeline", "root_cause_analysis", "trend_analysis"],
+          "inline_only_intents": ["reference", "dataset_summary", "schema_question"]
+        },
+        "follow_up_styles": ["reliability review", "metric correlation", "capacity assessment"]
+      }
+    },
+    "agent_data_access": {
+      "analyst": {
+        "tables": ["users", "orders", "order_items", "payments", "restaurants", "menu_items", "drivers", "funnel_events"],
+        "documents": [],
+        "access_type": "aggregated_views",
+        "description": "Customer segments, ordering patterns, revenue analysis, payment preferences. JOIN orders to users for city/platform/user_type dimensions."
+      },
+      "ux_researcher": {
+        "tables": ["reviews", "support_tickets", "ux_changelog"],
+        "documents": ["usability_study.md"],
+        "access_type": "direct",
+        "description": "Customer reviews, support tickets, usability research, and product change history. JOIN reviews/tickets to users for segment context."
+      },
+      "engineering_lead": {
+        "tables": ["deployments", "service_metrics", "error_log"],
+        "documents": ["system_architecture.md"],
+        "access_type": "direct",
+        "description": "Service reliability data, deployment history, detailed error log — informs SLA promises for premium tier."
+      }
+    }
+  },
+  "expected_investigation_path": [
+    "user_segmentation_overview",
+    "ordering_frequency_by_segment",
+    "revenue_and_arpu_analysis",
+    "city_platform_distribution",
+    "payment_method_preferences",
+    "review_satisfaction_themes",
+    "support_pain_points",
+    "service_reliability_assessment",
+    "membership_feature_design",
+    "pricing_and_launch_strategy"
+  ],
+  "expected_key_findings": [
+    "Power users order 4-5x more frequently than casual users and have significantly higher ARPU",
+    "Returning and power users together account for the majority of revenue",
+    "Android is the dominant platform among high-value users — mobile-first experience is critical",
+    "Bengaluru, Mumbai, and Delhi NCR concentrate the highest-value customer base",
+    "UPI is the preferred payment method for frequent orderers — payment reliability is a key satisfaction driver",
+    "Reviews from power users emphasize delivery speed, restaurant quality, and order accuracy",
+    "Support tickets from high-value users focus on payment issues and delivery delays — premium SLA opportunities",
+    "Service reliability data shows payment latency spikes affected user trust — premium tier should guarantee reliability",
+    "There is a natural segmentation between new/casual users (price-sensitive) and power/returning users (quality-sensitive)"
+  ],
+  "evaluation_rubric": {
+    "segmentation_quality": {
+      "weight": 0.30,
+      "levels": {
+        "excellent": "Clearly defines target segments using data-backed criteria (ordering frequency, ARPU, platform, city), with specific cohort sizes and behavioral patterns",
+        "good": "Identifies high-value segments but may lack precision in cohort definition or size estimates",
+        "adequate": "Recognizes that different user types exist but doesn't quantify or prioritize them",
+        "poor": "Generic targeting without data-backed segmentation"
+      }
+    },
+    "feature_design": {
+      "weight": 0.25,
+      "levels": {
+        "excellent": "Proposes features directly tied to identified pain points and satisfaction drivers (e.g., priority checkout, delivery guarantees, exclusive restaurants) with evidence from reviews and support data",
+        "good": "Proposes reasonable features connected to some user data",
+        "adequate": "Lists generic membership features without clear data linkage",
+        "poor": "Proposes features with no connection to customer analysis"
+      }
+    },
+    "pricing_rationale": {
+      "weight": 0.20,
+      "levels": {
+        "excellent": "Pricing model backed by ARPU analysis, ordering frequency, and willingness-to-pay signals from the data — includes value proposition math",
+        "good": "Reasonable pricing with some data support",
+        "adequate": "Suggests a price point without strong justification",
+        "poor": "No pricing recommendation or completely arbitrary"
+      }
+    },
+    "investigation_process": {
+      "weight": 0.25,
+      "levels": {
+        "excellent": "Systematically queries multiple agents, builds analysis from segmentation through to recommendation, uses both quantitative and qualitative evidence",
+        "good": "Uses multiple agents and builds a coherent analysis",
+        "adequate": "Explores some data but misses key dimensions or agents",
+        "poor": "Shallow analysis relying on a single agent or minimal data"
+      }
+    }
+  }
+}

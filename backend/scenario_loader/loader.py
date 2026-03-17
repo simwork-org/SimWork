@@ -1,69 +1,116 @@
+"""Scenario loader — reads scenario configs and reference data from the filesystem."""
+
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import pandas as pd
-
-from backend.config import get_settings
-from backend.models import ScenarioSummary
+SCENARIOS_DIR = Path(__file__).resolve().parent.parent.parent / "scenarios"
 
 
-@dataclass(slots=True)
-class ScenarioBundle:
-    scenario_id: str
-    config: dict[str, Any]
-    telemetry: dict[str, dict[str, Any]]
-
-
-class ScenarioLoader:
-    def __init__(self, base_path: Path | None = None) -> None:
-        self.base_path = base_path or get_settings().scenarios_path
-
-    def list_scenarios(self) -> list[ScenarioSummary]:
-        scenarios: list[ScenarioSummary] = []
-        if not self.base_path.exists():
-            return scenarios
-        for scenario_dir in sorted(path for path in self.base_path.iterdir() if path.is_dir()):
-            config_path = scenario_dir / "scenario_config.json"
-            if not config_path.exists():
-                continue
-            config = json.loads(config_path.read_text())
-            scenarios.append(
-                ScenarioSummary(
-                    id=config["scenario_id"],
-                    title=config["title"],
-                    difficulty=config["difficulty"],
-                    industry=config.get("industry"),
-                    product=config.get("product"),
-                )
+def list_scenarios() -> list[dict[str, str]]:
+    """Return metadata for every available scenario."""
+    results: list[dict[str, str]] = []
+    if not SCENARIOS_DIR.exists():
+        return results
+    for folder in sorted(SCENARIOS_DIR.iterdir()):
+        config_path = folder / "scenario_config.json"
+        if config_path.exists():
+            cfg = json.loads(config_path.read_text())
+            results.append(
+                {
+                    "id": cfg.get("scenario_id", folder.name),
+                    "title": cfg.get("title", folder.name),
+                    "difficulty": cfg.get("difficulty", "medium"),
+                    "description": cfg.get("problem_statement", ""),
+                    "scenario_type": cfg.get("scenario_type", "diagnostic"),
+                    "industry": cfg.get("industry"),
+                    "product": cfg.get("product"),
+                    "icon": cfg.get("icon"),
+                }
             )
-        return scenarios
+    return results
 
-    def load_scenario(self, scenario_id: str) -> ScenarioBundle:
-        scenario_dir = self.base_path / scenario_id
-        if not scenario_dir.exists():
-            raise FileNotFoundError(f"Scenario {scenario_id!r} not found")
 
-        config = json.loads((scenario_dir / "scenario_config.json").read_text())
-        telemetry: dict[str, dict[str, Any]] = {}
+def load_scenario(scenario_id: str) -> dict[str, Any]:
+    """Load a full scenario config by ID."""
+    scenario_dir = SCENARIOS_DIR / scenario_id
+    config_path = scenario_dir / "scenario_config.json"
+    if not config_path.exists():
+        raise FileNotFoundError(f"Scenario not found: {scenario_id}")
+    return json.loads(config_path.read_text())
 
-        for domain in ("analytics", "observability", "user_signals"):
-            domain_dir = scenario_dir / domain
-            if not domain_dir.exists():
-                telemetry[domain] = {}
-                continue
-            domain_payload: dict[str, Any] = {}
-            for file_path in sorted(domain_dir.iterdir()):
-                key = file_path.stem
-                if file_path.suffix == ".csv":
-                    domain_payload[key] = pd.read_csv(file_path)
-                elif file_path.suffix == ".json":
-                    domain_payload[key] = json.loads(file_path.read_text())
-                else:
-                    domain_payload[key] = file_path.read_text()
-            telemetry[domain] = domain_payload
 
-        return ScenarioBundle(scenario_id=scenario_id, config=config, telemetry=telemetry)
+def load_reference(scenario_id: str) -> dict[str, Any]:
+    """Load candidate-facing scenario reference content if available."""
+    reference_path = SCENARIOS_DIR / scenario_id / "reference.json"
+    if not reference_path.exists():
+        return {}
+    return json.loads(reference_path.read_text())
+
+
+def get_agent_data_access(scenario_id: str, agent: str) -> dict[str, Any]:
+    """Return scenario-backed access metadata for an agent."""
+    scenario = load_scenario(scenario_id)
+    access = scenario.get("data_model", {}).get("agent_data_access", {}).get(agent)
+    if not access:
+        raise ValueError(f"Agent '{agent}' is not configured for scenario '{scenario_id}'")
+    return access
+
+
+def get_agent_capability_profile(scenario_id: str, agent: str) -> dict[str, Any]:
+    """Return scenario-backed capability metadata for an agent."""
+    scenario = load_scenario(scenario_id)
+    profile = scenario.get("data_model", {}).get("agent_capability_profiles", {}).get(agent)
+    if not profile:
+        raise ValueError(f"Agent '{agent}' is missing a capability profile for scenario '{scenario_id}'")
+    return profile
+
+
+def get_agent_role_config(scenario_id: str, agent: str) -> dict[str, Any]:
+    """Return merged role config with persona, skills, and allowed sources."""
+    profile = get_agent_capability_profile(scenario_id, agent)
+    access = get_agent_data_access(scenario_id, agent)
+    raw_tables = access.get("tables", [])
+    raw_documents = access.get("documents", [])
+    allowed_tables = [name for name in raw_tables if not str(name).endswith(".md")]
+    allowed_documents = [name for name in raw_documents if str(name).endswith(".md")]
+    if not raw_documents:
+        allowed_documents = [name for name in raw_tables if str(name).endswith(".md")]
+    return {
+        **profile,
+        "allowed_tables": allowed_tables,
+        "allowed_documents": allowed_documents,
+        "access_description": access.get("description", ""),
+    }
+
+
+def get_agent_capability_profiles(scenario_id: str) -> dict[str, Any]:
+    """Return all scenario-backed capability profiles."""
+    scenario = load_scenario(scenario_id)
+    return scenario.get("data_model", {}).get("agent_capability_profiles", {})
+
+
+def load_tables(scenario_id: str, allowed_sources: list[str]) -> dict[str, Any]:
+    """Load specific sources from the scenario's SQLite database.
+
+    Only loads sources that appear in *allowed_sources* (agent-scoped access control).
+    Returns a dict mapping source name -> content.
+    """
+    from data_layer.db import get_document, query, table_exists
+
+    data: dict[str, Any] = {}
+    for source_name in allowed_sources:
+        if source_name.endswith(".md"):
+            content = get_document(scenario_id, source_name)
+            if content is not None:
+                data[source_name] = content
+        elif source_name.endswith(".json"):
+            # JSON files are still on filesystem
+            file_path = SCENARIOS_DIR / scenario_id / "tables" / source_name
+            if file_path.exists():
+                data[source_name] = json.loads(file_path.read_text())
+        elif table_exists(scenario_id, source_name):
+            data[source_name] = query(scenario_id, f"SELECT * FROM [{source_name}]")
+    return data

@@ -1,34 +1,40 @@
+"""FastAPI application entry point."""
+
 from __future__ import annotations
+
+import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.api.routes.scenarios import router as scenarios_router
-from backend.api.routes.sessions import router as sessions_router
-from backend.config import get_settings
-
-
-settings = get_settings()
+from api.routes import router
+from investigation_logger.logger import clear_all_session_data, init_db
 
 app = FastAPI(
     title="SimWork API",
-    description="Simulation interview backend for domain-restricted AI teammate workflows",
+    description="Simulation platform for evaluating investigation and decision-making skills",
     version="0.1.0",
 )
 
+# CORS
+origins = os.environ.get("CORS_ORIGINS", "http://localhost:3000").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins or ["*"],
+    allow_origins=[o.strip() for o in origins],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+app.include_router(router)
 
-app.include_router(scenarios_router, prefix=settings.api_prefix)
-app.include_router(sessions_router, prefix=settings.api_prefix)
+
+@app.on_event("startup")
+def on_startup():
+    init_db()
+    clear_all_session_data()
 
 
 @app.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok", "app": settings.app_name}
+def health():
+    return {"status": "ok"}

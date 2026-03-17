@@ -1,0 +1,248 @@
+{
+  "mission_brief": {
+    "title": "Premium Membership Launch",
+    "problem": "ZaikaNow wants to launch a premium membership tier ('ZaikaNow Gold') to boost retention and revenue among high-value customers.",
+    "objective": "Analyze the customer base, ordering patterns, payment behavior, and satisfaction signals to design the membership offering. Identify the target audience, propose features, recommend pricing, and outline a launch strategy.",
+    "notes": [
+      "Each teammate sees only their own operational domain.",
+      "Strong answers combine quantitative segmentation with qualitative user insights.",
+      "User attributes like city, platform, and user_type live in the users table. JOIN to users when analyzing orders, payments, or reviews by these dimensions.",
+      "The data spans Oct 2024 to Mar 2025. Use the full 6 months to understand seasonal patterns, user behavior, and segment dynamics."
+    ]
+  },
+  "source_catalog": [
+    {
+      "domain": "Analytics",
+      "agent": "analyst",
+      "sources": [
+        {
+          "name": "users",
+          "type": "table",
+          "description": "Customer profiles. Single source of truth for city, platform, and user_type. JOIN other tables to users via user_id to segment by these dimensions.",
+          "fields": [
+            { "name": "user_id", "type": "string", "description": "Primary key. Unique user identifier." },
+            { "name": "name", "type": "string", "description": "Customer name." },
+            { "name": "email", "type": "string", "description": "Unique email address." },
+            { "name": "phone", "type": "string", "description": "Phone number." },
+            { "name": "city", "type": "enum", "description": "Home metro: bengaluru / mumbai / delhi_ncr / hyderabad / pune / chennai." },
+            { "name": "area", "type": "string", "description": "Neighborhood within the city." },
+            { "name": "signup_date", "type": "date", "description": "Date the customer first signed up." },
+            { "name": "platform", "type": "enum", "description": "Primary device: ios / android / web." },
+            { "name": "user_type", "type": "enum", "description": "Segment: new / casual / returning / power." }
+          ]
+        },
+        {
+          "name": "orders",
+          "type": "table",
+          "description": "Order attempts with status and amount. JOIN to users for city/platform/user_type segmentation.",
+          "fields": [
+            { "name": "order_id", "type": "string", "description": "Primary key. Unique order identifier." },
+            { "name": "user_id", "type": "string", "description": "Foreign key to users." },
+            { "name": "restaurant_id", "type": "string", "description": "Foreign key to restaurants." },
+            { "name": "order_status", "type": "enum", "description": "completed / failed / cancelled." },
+            { "name": "total_amount", "type": "float", "description": "Order total in INR." },
+            { "name": "created_at", "type": "datetime", "description": "Order timestamp." }
+          ]
+        },
+        {
+          "name": "payments",
+          "type": "table",
+          "description": "Payment attempts with method, provider, status, and processing time. JOIN to orders then users for segmentation.",
+          "fields": [
+            { "name": "payment_id", "type": "string", "description": "Primary key." },
+            { "name": "order_id", "type": "string", "description": "Foreign key to orders." },
+            { "name": "method", "type": "enum", "description": "upi / credit_card / debit_card / wallet / cod." },
+            { "name": "provider", "type": "enum", "description": "rupeeflow_v2 / rupeeflow_v3 / cash_on_delivery." },
+            { "name": "status", "type": "enum", "description": "success / failed / timeout." },
+            { "name": "amount", "type": "float", "description": "Payment amount in INR." },
+            { "name": "processing_time_ms", "type": "int", "description": "Payment processing duration in milliseconds." },
+            { "name": "error_code", "type": "string", "description": "Error code when payment does not complete cleanly." },
+            { "name": "created_at", "type": "datetime", "description": "Payment timestamp." }
+          ]
+        },
+        {
+          "name": "restaurants",
+          "type": "table",
+          "description": "Restaurant listings with cuisine type and location.",
+          "fields": [
+            { "name": "restaurant_id", "type": "string", "description": "Primary key." },
+            { "name": "name", "type": "string", "description": "Restaurant name." },
+            { "name": "cuisine_type", "type": "string", "description": "Cuisine category." },
+            { "name": "city", "type": "enum", "description": "Restaurant city." },
+            { "name": "area", "type": "string", "description": "Neighborhood." },
+            { "name": "rating", "type": "float", "description": "Average rating (3.7-4.8)." }
+          ]
+        },
+        {
+          "name": "menu_items",
+          "type": "table",
+          "description": "Menu items with prices, linked to restaurants.",
+          "fields": [
+            { "name": "item_id", "type": "string", "description": "Primary key." },
+            { "name": "restaurant_id", "type": "string", "description": "Foreign key to restaurants." },
+            { "name": "name", "type": "string", "description": "Item name." },
+            { "name": "description", "type": "string", "description": "Item description." },
+            { "name": "price", "type": "float", "description": "Price in INR." }
+          ]
+        },
+        {
+          "name": "order_items",
+          "type": "table",
+          "description": "Line items within each order.",
+          "fields": [
+            { "name": "order_item_id", "type": "string", "description": "Primary key." },
+            { "name": "order_id", "type": "string", "description": "Foreign key to orders." },
+            { "name": "item_id", "type": "string", "description": "Foreign key to menu_items." },
+            { "name": "quantity", "type": "int", "description": "Quantity ordered." }
+          ]
+        },
+        {
+          "name": "drivers",
+          "type": "table",
+          "description": "Delivery driver roster with availability status.",
+          "fields": [
+            { "name": "driver_id", "type": "string", "description": "Primary key." },
+            { "name": "name", "type": "string", "description": "Driver name." },
+            { "name": "phone", "type": "string", "description": "Phone number." },
+            { "name": "city", "type": "enum", "description": "Operating city." },
+            { "name": "availability_status", "type": "enum", "description": "available / on_delivery / offline." }
+          ]
+        },
+        {
+          "name": "funnel_events",
+          "type": "table",
+          "description": "Session-level product events for browse-to-order funnel analysis. JOIN to users for city and user_type.",
+          "fields": [
+            { "name": "event_id", "type": "string", "description": "Primary key." },
+            { "name": "user_id", "type": "string", "description": "Foreign key to users." },
+            { "name": "session_id", "type": "string", "description": "Session identifier." },
+            { "name": "event_type", "type": "enum", "description": "app_open / restaurant_view / add_to_cart / checkout_start / payment_attempt / order_complete." },
+            { "name": "platform", "type": "enum", "description": "Device platform for this session: ios / android / web." },
+            { "name": "device", "type": "string", "description": "Device model or browser." },
+            { "name": "app_version", "type": "string", "description": "App version during the session." },
+            { "name": "timestamp", "type": "datetime", "description": "Event timestamp." }
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "User Signals",
+      "agent": "ux_researcher",
+      "sources": [
+        {
+          "name": "reviews",
+          "type": "table",
+          "description": "Customer reviews with ratings and free-text feedback. JOIN to users via user_id for segment context.",
+          "fields": [
+            { "name": "review_id", "type": "string", "description": "Primary key." },
+            { "name": "user_id", "type": "string", "description": "Foreign key to users." },
+            { "name": "order_id", "type": "string", "description": "Foreign key to orders." },
+            { "name": "rating", "type": "int", "description": "1-5 star score." },
+            { "name": "text", "type": "string", "description": "Review body." },
+            { "name": "created_at", "type": "datetime", "description": "Review timestamp." }
+          ]
+        },
+        {
+          "name": "support_tickets",
+          "type": "table",
+          "description": "Support tickets with issue category and priority. JOIN to users for segment context.",
+          "fields": [
+            { "name": "ticket_id", "type": "string", "description": "Primary key." },
+            { "name": "user_id", "type": "string", "description": "Foreign key to users." },
+            { "name": "order_id", "type": "string", "description": "Foreign key to orders (may be empty)." },
+            { "name": "category", "type": "string", "description": "Ticket category: payment, checkout, delivery, promo, account." },
+            { "name": "subcategory", "type": "string", "description": "Specific issue type." },
+            { "name": "description", "type": "string", "description": "Issue description text." },
+            { "name": "priority", "type": "enum", "description": "low / medium / high / critical." },
+            { "name": "status", "type": "enum", "description": "open / in_progress / resolved." },
+            { "name": "created_at", "type": "datetime", "description": "Ticket creation timestamp." },
+            { "name": "resolved_at", "type": "datetime", "description": "Resolution timestamp (empty if unresolved)." }
+          ]
+        },
+        {
+          "name": "usability_study.md",
+          "type": "document",
+          "description": "Moderated usability research notes (n=24, Jan 22-28, 2025) with findings on checkout experience and user satisfaction.",
+          "fields": []
+        },
+        {
+          "name": "ux_changelog",
+          "type": "table",
+          "description": "Recent UX changes, experiments, and bugfixes.",
+          "fields": [
+            { "name": "date", "type": "date", "description": "Change date." },
+            { "name": "change_type", "type": "enum", "description": "feature / bugfix / ab_test." },
+            { "name": "description", "type": "string", "description": "What changed." },
+            { "name": "affected_area", "type": "string", "description": "Product area: homepage, cart, checkout, search." },
+            { "name": "platform", "type": "enum", "description": "Target platform: all / android / ios / web." }
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "Engineering",
+      "agent": "engineering_lead",
+      "sources": [
+        {
+          "name": "deployments",
+          "type": "table",
+          "description": "Deployment history with service, description, and rollback status.",
+          "fields": [
+            { "name": "deploy_id", "type": "string", "description": "Primary key." },
+            { "name": "service", "type": "string", "description": "Service that was deployed." },
+            { "name": "description", "type": "string", "description": "Deployment summary." },
+            { "name": "author", "type": "string", "description": "Engineer who deployed." },
+            { "name": "timestamp", "type": "datetime", "description": "Deployment timestamp." },
+            { "name": "rollback_available", "type": "bool", "description": "Whether rollback is available." },
+            { "name": "commit_hash", "type": "string", "description": "Git commit hash." }
+          ]
+        },
+        {
+          "name": "service_metrics",
+          "type": "table",
+          "description": "Daily service latency and error-rate metrics. Useful for understanding platform reliability SLAs.",
+          "fields": [
+            { "name": "date", "type": "date", "description": "Metric date." },
+            { "name": "service", "type": "string", "description": "Service name." },
+            { "name": "p50_ms", "type": "int", "description": "Median latency in ms." },
+            { "name": "p95_ms", "type": "int", "description": "95th percentile latency." },
+            { "name": "p99_ms", "type": "int", "description": "99th percentile latency." },
+            { "name": "error_rate_pct", "type": "float", "description": "Error rate percentage." },
+            { "name": "error_count", "type": "int", "description": "Absolute error count." },
+            { "name": "request_count", "type": "int", "description": "Total requests." }
+          ]
+        },
+        {
+          "name": "error_log",
+          "type": "table",
+          "description": "Row-per-error detail log across services — useful for understanding reliability by service and payment method.",
+          "fields": [
+            { "name": "error_id", "type": "string", "description": "Primary key." },
+            { "name": "timestamp", "type": "datetime", "description": "Error timestamp." },
+            { "name": "session_id", "type": "string", "description": "Session identifier (empty for non-order errors)." },
+            { "name": "order_id", "type": "string", "description": "Order identifier (empty for non-order errors)." },
+            { "name": "service", "type": "string", "description": "Service: payment_service / search_service / notification_service." },
+            { "name": "error_code", "type": "string", "description": "Error code." },
+            { "name": "payment_method", "type": "string", "description": "Payment method (only for payment_service errors)." },
+            { "name": "platform", "type": "enum", "description": "Platform: ios / android / web." },
+            { "name": "severity", "type": "enum", "description": "critical / high / medium / low." }
+          ]
+        },
+        {
+          "name": "system_architecture.md",
+          "type": "document",
+          "description": "System topology, payment path, and operational architecture notes.",
+          "fields": []
+        }
+      ]
+    }
+  ],
+  "glossary": [
+    { "term": "ARPU", "definition": "Average Revenue Per User — total revenue divided by the number of active users in a period." },
+    { "term": "Cohort LTV", "definition": "Lifetime value of a customer cohort, estimated from ordering frequency and average order value." },
+    { "term": "Power user", "definition": "High-frequency customer segment with repeat ordering behavior and above-average spend." },
+    { "term": "Willingness to pay", "definition": "The maximum price a customer segment would accept for a premium offering, inferred from ordering patterns and spend behavior." },
+    { "term": "Churn risk", "definition": "The probability that a customer stops using the platform, often indicated by declining order frequency or negative review sentiment." },
+    { "term": "Premium conversion rate", "definition": "The share of eligible users who would subscribe to a paid membership tier." }
+  ]
+}
