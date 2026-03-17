@@ -20,7 +20,6 @@ import {
   type Citation,
   type PendingFollowUp,
   type QueryLogDetail,
-  type QueryHistoryItem,
   type ReferencePanel,
   type SavedEvidence,
   type ScenarioDetail,
@@ -565,14 +564,20 @@ function QueryLogModal({
   onClose: () => void;
 }) {
   const [detail, setDetail] = useState<QueryLogDetail | null>(null);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setLoading(true);
+    let isActive = true;
     getQueryLogDetail(sessionId, queryLogId)
-      .then(setDetail)
-      .catch(console.error)
-      .finally(() => setLoading(false));
+      .then((value) => {
+        if (isActive) {
+          setDetail(value);
+        }
+      })
+      .catch(console.error);
+
+    return () => {
+      isActive = false;
+    };
   }, [sessionId, queryLogId]);
 
   return (
@@ -594,14 +599,14 @@ function QueryLogModal({
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
-          {loading && (
+          {!detail && (
             <div className="flex items-center justify-center py-10 text-slate-400 text-sm">
               <span className="material-symbols-outlined animate-spin mr-2">progress_activity</span>
               Loading execution log...
             </div>
           )}
 
-          {detail && !loading && (
+          {detail && (
             <>
               {/* Planner */}
               {detail.planner && Object.keys(detail.planner).length > 0 && (
@@ -803,7 +808,6 @@ function InlineArtifactCard({
   artifact,
   citation,
   queryLogId,
-  agent,
   savedEvidenceMap,
   draftAnnotation,
   onDraftChange,
@@ -812,7 +816,6 @@ function InlineArtifactCard({
   artifact: Artifact;
   citation: Citation | undefined;
   queryLogId?: number;
-  agent: string;
   savedEvidenceMap: Map<string, SavedEvidence>;
   draftAnnotation: string;
   onDraftChange: (value: string) => void;
@@ -874,11 +877,7 @@ function SavedEvidenceCard({
 }) {
   const [editing, setEditing] = useState(false);
   const [annotation, setAnnotation] = useState(item.annotation || "");
-  const agentInfo = AGENTS.find((agent) => agent.id === item.agent);
-
-  useEffect(() => {
-    setAnnotation(item.annotation || "");
-  }, [item.annotation]);
+  const agentInfo = AGENTS.find((entry) => entry.id === item.agent);
 
   return (
     <div className="bg-slate-50 dark:bg-slate-800/30 rounded-xl border border-slate-200 dark:border-slate-700/50 p-4">
@@ -919,7 +918,12 @@ function SavedEvidenceCard({
       </div>
       <div className="mt-3 flex gap-2">
         <button
-          onClick={() => setEditing((value) => !value)}
+          onClick={() => {
+            if (!editing) {
+              setAnnotation(item.annotation || "");
+            }
+            setEditing((value) => !value);
+          }}
           className="text-[10px] px-2.5 py-1 rounded-full border border-slate-300 dark:border-slate-700 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
         >
           {editing ? "Cancel" : item.annotation ? "Edit note" : "Add note"}
@@ -1057,7 +1061,6 @@ export default function WorkspacePage() {
   const currentSuggestions = currentPendingFollowUp?.choices?.length
     ? currentPendingFollowUp.choices
     : (currentAgentGuidance?.suggestions?.length ? currentAgentGuidance.suggestions : (QUICK_SUGGESTIONS[selectedAgent] || []));
-  const queryCount = useMemo(() => messages.filter((item) => item.role === "user").length, [messages]);
 
   const sendQuery = useCallback(async (query: string, inputMode: "typed" | "suggestion" = "typed") => {
     if (!query.trim() || isQuerying) return;
@@ -1146,6 +1149,7 @@ export default function WorkspacePage() {
       />
       {logModalQueryId !== null && (
         <QueryLogModal
+          key={logModalQueryId}
           sessionId={sessionId}
           queryLogId={logModalQueryId}
           onClose={() => setLogModalQueryId(null)}
