@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useAuthToken } from "@/lib/useAuthToken";
 import {
   getSavedEvidence,
   logSessionEvent,
@@ -76,6 +77,7 @@ function ArtifactPreview({ item }: { item: SavedEvidence }) {
 export default function CompletionPage() {
   const params = useParams();
   const router = useRouter();
+  useAuthToken();
   const sessionId = params.sessionId as string;
 
   const [rootCause, setRootCause] = useState("");

@@ -1,11 +1,25 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 const PREFIX = "/api/v1";
 
+let _authToken: string | null = null;
+
+export function setAuthToken(token: string | null) {
+  _authToken = token;
+}
+
 async function fetchJSON<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (_authToken) {
+    headers["Authorization"] = `Bearer ${_authToken}`;
+  }
   const res = await fetch(`${API_BASE}${path}`, {
-    headers: { "Content-Type": "application/json" },
+    headers,
     ...init,
   });
+  if (res.status === 401 && typeof window !== "undefined") {
+    window.location.href = "/login";
+    throw new Error("Session expired");
+  }
   if (!res.ok) {
     throw new Error(`API error ${res.status}: ${await res.text()}`);
   }
@@ -281,9 +295,13 @@ export async function queryAgentStream(
   onStatus: (stage: string, detail: string) => void,
   inputMode: "typed" | "suggestion" = "typed"
 ): Promise<QueryResponse> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (_authToken) {
+    headers["Authorization"] = `Bearer ${_authToken}`;
+  }
   const response = await fetch(`${API_BASE}${PREFIX}/sessions/${sessionId}/query/stream`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({ agent, query, input_mode: inputMode }),
   });
   if (!response.ok || !response.body) {

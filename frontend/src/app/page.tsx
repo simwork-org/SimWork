@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { signOut } from "next-auth/react";
+import { useAuthToken } from "@/lib/useAuthToken";
 import {
   listScenarios,
   getChallenges,
@@ -19,6 +21,7 @@ const FALLBACK_ICON = "assignment";
 
 export default function LandingPage() {
   const router = useRouter();
+  const authSession = useAuthToken();
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [challengeMap, setChallengeMap] = useState<Record<string, string>>({});
   const [loadingId, setLoadingId] = useState<string | null>(null);
@@ -51,7 +54,8 @@ export default function LandingPage() {
     if (!challengeId) return;
     setLoadingId(scenarioId);
     try {
-      const session = await startSession("candidate_default", scenarioId, challengeId);
+      const candidateId = authSession?.user?.id || "candidate_default";
+      const session = await startSession(candidateId, scenarioId, challengeId);
       router.push(`/workspace/${session.session_id}`);
     } catch (err) {
       console.error(err);
@@ -84,9 +88,27 @@ export default function LandingPage() {
               <a className="text-slate-600 dark:text-slate-300 text-sm font-medium hover:text-[#10B981] transition-colors" href="#">Resources</a>
             </nav>
             <div className="h-6 w-px bg-slate-200 dark:bg-slate-800 mx-2 hidden md:block" />
-            <button className="flex items-center justify-center rounded-lg h-10 px-5 bg-[#10B981] text-white text-sm font-bold hover:opacity-90 transition-opacity">
-              Profile
-            </button>
+            {authSession?.user && (
+              <div className="flex items-center gap-3">
+                {authSession.user.image && (
+                  <img
+                    src={authSession.user.image}
+                    alt=""
+                    className="size-8 rounded-full"
+                    referrerPolicy="no-referrer"
+                  />
+                )}
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-200 hidden md:inline">
+                  {authSession.user.name}
+                </span>
+                <button
+                  onClick={() => signOut({ callbackUrl: "/login" })}
+                  className="flex items-center justify-center rounded-lg h-9 px-4 bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-medium hover:opacity-80 transition-opacity"
+                >
+                  Sign out
+                </button>
+              </div>
+            )}
           </div>
         </header>
 

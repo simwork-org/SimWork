@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from typing import Any, Literal, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from investigation_logger.logger import get_query_history
+from api.auth import get_current_user
+from investigation_logger.logger import get_query_history, get_user, get_user_sessions
 from scenario_loader.loader import list_scenarios
 from simulation_engine.engine import (
     get_challenges,
@@ -73,15 +74,15 @@ class SubmitRequest(BaseModel):
 
 
 @router.post("/sessions/start")
-def api_start_session(req: StartSessionRequest):
+def api_start_session(req: StartSessionRequest, user: dict = Depends(get_current_user)):
     try:
-        return start_session(req.candidate_id, req.scenario_id, req.challenge_id)
+        return start_session(user["user_id"], req.scenario_id, req.challenge_id)
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail={"error": "scenario_not_found", "message": f"Scenario '{req.scenario_id}' not found"})
 
 
 @router.get("/sessions/{session_id}/scenario")
-def api_get_scenario(session_id: str):
+def api_get_scenario(session_id: str, user: dict = Depends(get_current_user)):
     try:
         return get_scenario_details(session_id)
     except ValueError as exc:
@@ -89,7 +90,7 @@ def api_get_scenario(session_id: str):
 
 
 @router.post("/sessions/{session_id}/query")
-def api_query_agent(session_id: str, req: QueryRequest):
+def api_query_agent(session_id: str, req: QueryRequest, user: dict = Depends(get_current_user)):
     try:
         return handle_query(session_id, req.agent, req.query, input_mode=req.input_mode)
     except ValueError as exc:
@@ -100,7 +101,7 @@ def api_query_agent(session_id: str, req: QueryRequest):
 
 
 @router.post("/sessions/{session_id}/query/stream")
-async def api_query_agent_stream(session_id: str, req: QueryRequest):
+async def api_query_agent_stream(session_id: str, req: QueryRequest, user: dict = Depends(get_current_user)):
     try:
         return StreamingResponse(
             handle_query_stream(session_id, req.agent, req.query, input_mode=req.input_mode),
@@ -115,7 +116,7 @@ async def api_query_agent_stream(session_id: str, req: QueryRequest):
 
 
 @router.post("/sessions/{session_id}/events")
-def api_log_session_event(session_id: str, req: SessionEventRequest):
+def api_log_session_event(session_id: str, req: SessionEventRequest, user: dict = Depends(get_current_user)):
     try:
         return handle_log_event(session_id, req.event_type, req.event_payload)
     except ValueError as exc:
@@ -126,12 +127,12 @@ def api_log_session_event(session_id: str, req: SessionEventRequest):
 
 
 @router.get("/sessions/{session_id}/history")
-def api_get_history(session_id: str):
+def api_get_history(session_id: str, user: dict = Depends(get_current_user)):
     return {"queries": get_query_history(session_id)}
 
 
 @router.get("/sessions/{session_id}/query/{query_log_id}")
-def api_get_query_log(session_id: str, query_log_id: int):
+def api_get_query_log(session_id: str, query_log_id: int, user: dict = Depends(get_current_user)):
     try:
         return handle_get_query_log(session_id, query_log_id)
     except ValueError as exc:
@@ -139,7 +140,7 @@ def api_get_query_log(session_id: str, query_log_id: int):
 
 
 @router.get("/sessions/{session_id}/evidence")
-def api_get_saved_evidence(session_id: str):
+def api_get_saved_evidence(session_id: str, user: dict = Depends(get_current_user)):
     try:
         return handle_get_saved_evidence(session_id)
     except ValueError as exc:
@@ -147,7 +148,7 @@ def api_get_saved_evidence(session_id: str):
 
 
 @router.post("/sessions/{session_id}/evidence")
-def api_save_evidence(session_id: str, req: SaveEvidenceRequest):
+def api_save_evidence(session_id: str, req: SaveEvidenceRequest, user: dict = Depends(get_current_user)):
     try:
         return handle_save_evidence(session_id, req.query_log_id, req.citation_id, req.agent, req.annotation)
     except ValueError as exc:
@@ -155,7 +156,7 @@ def api_save_evidence(session_id: str, req: SaveEvidenceRequest):
 
 
 @router.patch("/sessions/{session_id}/evidence/{saved_evidence_id}")
-def api_update_saved_evidence(session_id: str, saved_evidence_id: int, req: UpdateEvidenceAnnotationRequest):
+def api_update_saved_evidence(session_id: str, saved_evidence_id: int, req: UpdateEvidenceAnnotationRequest, user: dict = Depends(get_current_user)):
     try:
         return handle_update_evidence_annotation(session_id, saved_evidence_id, req.annotation)
     except ValueError as exc:
@@ -163,7 +164,7 @@ def api_update_saved_evidence(session_id: str, saved_evidence_id: int, req: Upda
 
 
 @router.delete("/sessions/{session_id}/evidence/{saved_evidence_id}")
-def api_delete_saved_evidence(session_id: str, saved_evidence_id: int):
+def api_delete_saved_evidence(session_id: str, saved_evidence_id: int, user: dict = Depends(get_current_user)):
     try:
         return handle_remove_evidence(session_id, saved_evidence_id)
     except ValueError as exc:
@@ -171,7 +172,7 @@ def api_delete_saved_evidence(session_id: str, saved_evidence_id: int):
 
 
 @router.post("/sessions/{session_id}/submit")
-def api_submit_solution(session_id: str, req: SubmitRequest):
+def api_submit_solution(session_id: str, req: SubmitRequest, user: dict = Depends(get_current_user)):
     try:
         return handle_submission(
             session_id,
@@ -185,7 +186,7 @@ def api_submit_solution(session_id: str, req: SubmitRequest):
 
 
 @router.get("/sessions/{session_id}/status")
-def api_session_status(session_id: str):
+def api_session_status(session_id: str, user: dict = Depends(get_current_user)):
     try:
         return get_session_status(session_id)
     except ValueError as exc:
@@ -193,7 +194,7 @@ def api_session_status(session_id: str):
 
 
 @router.get("/sessions/{session_id}/events")
-def api_session_events(session_id: str):
+def api_session_events(session_id: str, user: dict = Depends(get_current_user)):
     try:
         return get_session_process_log(session_id)
     except ValueError as exc:
@@ -201,7 +202,7 @@ def api_session_events(session_id: str):
 
 
 @router.post("/sessions/{session_id}/score")
-def api_score_session(session_id: str):
+def api_score_session(session_id: str, user: dict = Depends(get_current_user)):
     try:
         return handle_score_session(session_id)
     except ValueError as exc:
@@ -209,11 +210,24 @@ def api_score_session(session_id: str):
 
 
 @router.get("/sessions/{session_id}/score")
-def api_get_score(session_id: str):
+def api_get_score(session_id: str, user: dict = Depends(get_current_user)):
     try:
         return handle_get_score(session_id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail={"error": "score_not_found", "message": str(exc)})
+
+
+@router.get("/me")
+def api_get_me(user: dict = Depends(get_current_user)):
+    profile = get_user(user["user_id"])
+    if profile is None:
+        return user
+    return profile
+
+
+@router.get("/me/sessions")
+def api_get_my_sessions(user: dict = Depends(get_current_user)):
+    return {"sessions": get_user_sessions(user["user_id"])}
 
 
 @router.get("/scenarios")

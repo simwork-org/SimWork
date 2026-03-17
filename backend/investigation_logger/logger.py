@@ -144,6 +144,15 @@ def init_db() -> None:
             scored_at TEXT NOT NULL,
             FOREIGN KEY (session_id) REFERENCES sessions(session_id)
         );
+
+        CREATE TABLE IF NOT EXISTS users (
+            id TEXT PRIMARY KEY,
+            email TEXT NOT NULL UNIQUE,
+            name TEXT,
+            picture TEXT,
+            created_at TEXT NOT NULL,
+            last_login_at TEXT NOT NULL
+        );
         """
     )
     _ensure_query_log_columns(conn)
@@ -169,6 +178,47 @@ def clear_all_session_data() -> None:
     )
     conn.commit()
     conn.close()
+
+
+def upsert_user(user_id: str, email: str, name: str | None = None, picture: str | None = None) -> None:
+    """Insert a new user or update last_login_at for an existing one."""
+    conn = _get_conn()
+    now = _utcnow()
+    conn.execute(
+        """
+        INSERT INTO users (id, email, name, picture, created_at, last_login_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+            email = excluded.email,
+            name = excluded.name,
+            picture = excluded.picture,
+            last_login_at = excluded.last_login_at
+        """,
+        (user_id, email, name, picture, now, now),
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_user(user_id: str) -> dict[str, Any] | None:
+    """Get a user by ID."""
+    conn = _get_conn()
+    row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+    conn.close()
+    if row is None:
+        return None
+    return dict(row)
+
+
+def get_user_sessions(user_id: str) -> list[dict[str, Any]]:
+    """Get all sessions for a user."""
+    conn = _get_conn()
+    rows = conn.execute(
+        "SELECT session_id, scenario_id, started_at, status FROM sessions WHERE candidate_id = ? ORDER BY started_at DESC",
+        (user_id,),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
 
 
 def create_session(session_id: str, candidate_id: str, scenario_id: str, challenge_id: str | None = None) -> None:

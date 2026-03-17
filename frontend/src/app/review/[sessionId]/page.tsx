@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { useAuthToken } from "@/lib/useAuthToken";
 import {
   getSavedEvidence,
   getScoringResult,
@@ -103,6 +104,7 @@ function BulletList({ title, items, icon, color }: { title: string; items: strin
 
 export default function ReviewPage() {
   const params = useParams();
+  useAuthToken();
   const sessionId = params.sessionId as string;
 
   const [scoring, setScoring] = useState<ScoringResult | null>(null);
