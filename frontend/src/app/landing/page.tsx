@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
 
 const STEPS = [
   {
@@ -52,6 +55,88 @@ const BG_STYLE = {
   backgroundSize: "24px 24px, 100% 100%, 100% 100%",
 };
 
+function DemoForm() {
+  const [email, setEmail] = useState("");
+  const [company, setCompany] = useState("");
+  const [message, setMessage] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    // TODO: wire to backend API or email service
+    await new Promise((r) => setTimeout(r, 800));
+    setSubmitted(true);
+    setSubmitting(false);
+  };
+
+  if (submitted) {
+    return (
+      <div className="text-center py-8">
+        <div className="flex items-center justify-center size-14 rounded-full bg-[#10B981]/10 mx-auto mb-4">
+          <span className="material-symbols-outlined text-3xl text-[#10B981]">check_circle</span>
+        </div>
+        <h3 className="text-xl font-bold text-white mb-2">Thank you!</h3>
+        <p className="text-sm text-slate-400">We&apos;ll reach out to you shortly.</p>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="w-full max-w-md mx-auto space-y-4 text-left">
+      <div>
+        <label htmlFor="email" className="block text-sm font-medium text-slate-300 mb-1.5">
+          Work Email <span className="text-red-400">*</span>
+        </label>
+        <input
+          id="email"
+          type="email"
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="you@company.com"
+          className="w-full rounded-lg px-4 py-3 bg-slate-800/50 border border-slate-700 text-white text-sm placeholder:text-slate-500 focus:outline-none focus:border-[#10B981] transition-colors"
+        />
+      </div>
+      <div>
+        <label htmlFor="company" className="block text-sm font-medium text-slate-300 mb-1.5">
+          Company <span className="text-red-400">*</span>
+        </label>
+        <input
+          id="company"
+          type="text"
+          required
+          value={company}
+          onChange={(e) => setCompany(e.target.value)}
+          placeholder="Company name"
+          className="w-full rounded-lg px-4 py-3 bg-slate-800/50 border border-slate-700 text-white text-sm placeholder:text-slate-500 focus:outline-none focus:border-[#10B981] transition-colors"
+        />
+      </div>
+      <div>
+        <label htmlFor="message" className="block text-sm font-medium text-slate-300 mb-1.5">
+          Message <span className="text-slate-500">(optional)</span>
+        </label>
+        <textarea
+          id="message"
+          rows={3}
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          placeholder="Tell us about your hiring needs..."
+          className="w-full rounded-lg px-4 py-3 bg-slate-800/50 border border-slate-700 text-white text-sm placeholder:text-slate-500 focus:outline-none focus:border-[#10B981] transition-colors resize-none"
+        />
+      </div>
+      <button
+        type="submit"
+        disabled={submitting}
+        className="w-full rounded-xl px-8 py-4 bg-[#10B981] text-base font-bold shadow-lg shadow-[#10B981]/25 hover:shadow-[#10B981]/40 transition-shadow disabled:opacity-60"
+      >
+        {submitting ? "Submitting..." : "Request a Demo"}
+      </button>
+    </form>
+  );
+}
+
 export default function LandingPage() {
   return (
     <div className="min-h-screen text-white" style={BG_STYLE}>
@@ -70,12 +155,12 @@ export default function LandingPage() {
           >
             Login
           </Link>
-          <a
-            href="#cta"
+          <Link
+            href="/login"
             className="rounded-lg px-5 py-2.5 bg-[#10B981] text-sm font-bold text-white hover:bg-emerald-600 transition-colors"
           >
-            Request Demo
-          </a>
+            Sign Up
+          </Link>
         </div>
       </nav>
 
@@ -195,20 +280,15 @@ export default function LandingPage() {
         <div className="relative rounded-2xl overflow-hidden">
           {/* Gradient glow */}
           <div className="absolute inset-0 bg-gradient-to-r from-[#10B981]/20 via-transparent to-[#10B981]/10 blur-xl" />
-          <div className="relative rounded-2xl border border-slate-800 bg-[#101122] p-12 md:p-16 text-center">
+          <div className="relative rounded-2xl border border-slate-800 bg-[#101122] p-10 md:p-16 text-center">
             <h2 className="text-3xl md:text-4xl font-black mb-4">
               Ready to see candidates in action?
             </h2>
-            <p className="text-slate-400 max-w-xl mx-auto mb-8">
+            <p className="text-slate-400 max-w-xl mx-auto mb-10">
               Join 200+ companies using SimWork to identify their next top
               performers with objective simulation data.
             </p>
-            <a
-              href="mailto:hello@simwork.ai"
-              className="inline-block rounded-xl px-8 py-4 bg-[#10B981] text-base font-bold shadow-lg shadow-[#10B981]/25 hover:shadow-[#10B981]/40 transition-shadow"
-            >
-              Request a Demo
-            </a>
+            <DemoForm />
           </div>
         </div>
       </section>
