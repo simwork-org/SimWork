@@ -207,7 +207,7 @@ export default function LandingPage() {
             Login
           </Link>
           <Link
-            href="/login"
+            href="/login?role=company"
             className="rounded-lg px-5 py-2.5 bg-[#10B981] text-sm font-bold text-white hover:bg-emerald-600 transition-colors"
           >
             Sign Up

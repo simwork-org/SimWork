@@ -450,3 +450,122 @@ export async function getQueryLogDetail(
 ): Promise<QueryLogDetail> {
   return fetchJSON(`${PREFIX}/sessions/${sessionId}/query/${queryLogId}`);
 }
+
+// ── User / Role ─────────────────────────────────────────────────────
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  name?: string | null;
+  picture?: string | null;
+  role: string;
+  company_id?: number | null;
+}
+
+export async function getMe(): Promise<UserProfile> {
+  return fetchJSON(`${PREFIX}/me`);
+}
+
+export async function setMyRole(role: "company" | "candidate"): Promise<{ role: string }> {
+  return fetchJSON(`${PREFIX}/me/role`, {
+    method: "POST",
+    body: JSON.stringify({ role }),
+  });
+}
+
+// ── Company ─────────────────────────────────────────────────────────
+
+export async function createCompany(name: string): Promise<{ id: number; name: string }> {
+  return fetchJSON(`${PREFIX}/companies`, {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+}
+
+export async function getMyCompany(): Promise<{ id: number; name: string; owner_user_id: string }> {
+  return fetchJSON(`${PREFIX}/companies/me`);
+}
+
+// ── Assessments ─────────────────────────────────────────────────────
+
+export interface Assessment {
+  id: string;
+  company_id: number;
+  scenario_id: string;
+  challenge_id?: string | null;
+  title?: string | null;
+  created_at: string;
+  candidate_total: number;
+  candidate_completed: number;
+  candidate_active: number;
+}
+
+export interface AssessmentCandidate {
+  session_id: string;
+  candidate_id: string;
+  started_at: string;
+  ended_at?: string | null;
+  status: string;
+  email?: string | null;
+  name?: string | null;
+  picture?: string | null;
+  overall_score?: number | null;
+  scored_at?: string | null;
+}
+
+export interface InviteInfo {
+  token: string;
+  candidate_email?: string | null;
+  created_at: string;
+  used_at?: string | null;
+  claimed_by_email?: string | null;
+  claimed_by_name?: string | null;
+}
+
+export async function createAssessment(
+  scenarioId: string,
+  challengeId?: string | null,
+  title?: string | null,
+): Promise<{ id: string }> {
+  return fetchJSON(`${PREFIX}/assessments`, {
+    method: "POST",
+    body: JSON.stringify({ scenario_id: scenarioId, challenge_id: challengeId, title }),
+  });
+}
+
+export async function listAssessments(): Promise<{ assessments: Assessment[] }> {
+  return fetchJSON(`${PREFIX}/assessments`);
+}
+
+export async function getAssessmentDetail(
+  assessmentId: string
+): Promise<{ assessment: Assessment; candidates: AssessmentCandidate[]; invites: InviteInfo[] }> {
+  return fetchJSON(`${PREFIX}/assessments/${assessmentId}`);
+}
+
+export async function generateInvite(
+  assessmentId: string,
+  candidateEmail?: string
+): Promise<{ token: string; invite_url: string }> {
+  return fetchJSON(`${PREFIX}/assessments/${assessmentId}/invite`, {
+    method: "POST",
+    body: JSON.stringify({ candidate_email: candidateEmail || null }),
+  });
+}
+
+// ── Invite ──────────────────────────────────────────────────────────
+
+export interface InviteValidation {
+  token: string;
+  scenario_id: string;
+  assessment_title?: string | null;
+  company_name?: string | null;
+}
+
+export async function validateInvite(token: string): Promise<InviteValidation> {
+  return fetchJSON(`${PREFIX}/invite/${token}`);
+}
+
+export async function claimInvite(token: string): Promise<{ session_id: string; claimed: boolean }> {
+  return fetchJSON(`${PREFIX}/invite/${token}/claim`, { method: "POST" });
+}

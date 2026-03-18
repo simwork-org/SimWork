@@ -1,6 +1,8 @@
 "use client";
 
+import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
+import { Suspense } from "react";
 
 const FEATURES = [
   {
@@ -20,7 +22,18 @@ const FEATURES = [
   },
 ];
 
-export default function LoginPage() {
+function LoginContent() {
+  const searchParams = useSearchParams();
+  const role = searchParams.get("role") || "";
+  const invite = searchParams.get("invite") || "";
+
+  const handleSignIn = () => {
+    // Store role/invite in cookies so /auth/redirect can read them
+    if (role) document.cookie = `simwork_role=${role};path=/;max-age=600`;
+    if (invite) document.cookie = `simwork_invite=${invite};path=/;max-age=600`;
+    signIn("google", { callbackUrl: "/auth/redirect" });
+  };
+
   return (
     <div
       className="flex min-h-screen"
@@ -88,7 +101,7 @@ export default function LoginPage() {
           <p className="text-sm text-slate-400 mb-6">Sign in to start your simulation</p>
 
           <button
-            onClick={() => signIn("google", { callbackUrl: "/" })}
+            onClick={handleSignIn}
             className="flex w-full items-center justify-center gap-3 rounded-lg bg-white px-4 py-3 text-sm font-medium text-slate-900 transition hover:bg-slate-100"
           >
             <svg className="size-5" viewBox="0 0 24 24">
@@ -118,5 +131,13 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginContent />
+    </Suspense>
   );
 }
