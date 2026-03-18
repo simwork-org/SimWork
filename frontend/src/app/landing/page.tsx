@@ -25,7 +25,7 @@ const DIFFERENTIATORS = [
   {
     icon: "verified",
     title: "Observe Real Work, Not Rehearsed Answers",
-    desc: "Stop relying on trivia questions. See how candidates actually navigate ambiguity and make data-driven decisions.",
+    desc: "Stop relying on typical interview questions. See how candidates actually navigate ambiguity and make data-driven decisions.",
   },
   {
     icon: "smart_toy",
@@ -328,7 +328,7 @@ export default function LandingPage() {
       {/* ── Footer ── */}
       <footer className="border-t border-slate-800 py-8 px-6">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4 text-slate-500 text-sm">
-          <p>&copy; 2024 SimWork Inc. All rights reserved.</p>
+          <p>&copy; 2026 SimWork Inc. All rights reserved.</p>
           <div className="flex gap-6">
             <a className="hover:text-[#10B981] transition-colors" href="#">
               Privacy Policy
