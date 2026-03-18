@@ -55,7 +55,7 @@ const BG_STYLE = {
   backgroundSize: "24px 24px, 100% 100%, 100% 100%",
 };
 
-function DemoForm() {
+function DemoForm({ onClose }: { onClose: () => void }) {
   const [email, setEmail] = useState("");
   const [company, setCompany] = useState("");
   const [message, setMessage] = useState("");
@@ -84,56 +84,98 @@ function DemoForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="w-full max-w-md mx-auto space-y-4 text-left">
-      <div>
-        <label htmlFor="email" className="block text-sm font-medium text-slate-300 mb-1.5">
-          Work Email <span className="text-red-400">*</span>
-        </label>
-        <input
-          id="email"
-          type="email"
-          required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="you@company.com"
-          className="w-full rounded-lg px-4 py-3 bg-slate-800/50 border border-slate-700 text-white text-sm placeholder:text-slate-500 focus:outline-none focus:border-[#10B981] transition-colors"
-        />
-      </div>
-      <div>
-        <label htmlFor="company" className="block text-sm font-medium text-slate-300 mb-1.5">
-          Company <span className="text-red-400">*</span>
-        </label>
-        <input
-          id="company"
-          type="text"
-          required
-          value={company}
-          onChange={(e) => setCompany(e.target.value)}
-          placeholder="Company name"
-          className="w-full rounded-lg px-4 py-3 bg-slate-800/50 border border-slate-700 text-white text-sm placeholder:text-slate-500 focus:outline-none focus:border-[#10B981] transition-colors"
-        />
-      </div>
-      <div>
-        <label htmlFor="message" className="block text-sm font-medium text-slate-300 mb-1.5">
-          Message <span className="text-slate-500">(optional)</span>
-        </label>
-        <textarea
-          id="message"
-          rows={3}
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          placeholder="Tell us about your hiring needs..."
-          className="w-full rounded-lg px-4 py-3 bg-slate-800/50 border border-slate-700 text-white text-sm placeholder:text-slate-500 focus:outline-none focus:border-[#10B981] transition-colors resize-none"
-        />
-      </div>
+    <div className="relative w-full max-w-md mx-auto">
       <button
-        type="submit"
-        disabled={submitting}
-        className="w-full rounded-xl px-8 py-4 bg-[#10B981] text-base font-bold shadow-lg shadow-[#10B981]/25 hover:shadow-[#10B981]/40 transition-shadow disabled:opacity-60"
+        type="button"
+        onClick={onClose}
+        className="absolute -top-2 -right-2 flex items-center justify-center size-8 rounded-full bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+        title="Close"
       >
-        {submitting ? "Submitting..." : "Request a Demo"}
+        <span className="material-symbols-outlined text-lg">close</span>
       </button>
-    </form>
+      <form onSubmit={handleSubmit} className="space-y-4 text-left">
+        <div>
+          <label htmlFor="email" className="block text-sm font-medium text-slate-300 mb-1.5">
+            Work Email <span className="text-red-400">*</span>
+          </label>
+          <input
+            id="email"
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@company.com"
+            className="w-full rounded-lg px-4 py-3 bg-slate-800/50 border border-slate-700 text-white text-sm placeholder:text-slate-500 focus:outline-none focus:border-[#10B981] transition-colors"
+          />
+        </div>
+        <div>
+          <label htmlFor="company" className="block text-sm font-medium text-slate-300 mb-1.5">
+            Company <span className="text-red-400">*</span>
+          </label>
+          <input
+            id="company"
+            type="text"
+            required
+            value={company}
+            onChange={(e) => setCompany(e.target.value)}
+            placeholder="Company name"
+            className="w-full rounded-lg px-4 py-3 bg-slate-800/50 border border-slate-700 text-white text-sm placeholder:text-slate-500 focus:outline-none focus:border-[#10B981] transition-colors"
+          />
+        </div>
+        <div>
+          <label htmlFor="message" className="block text-sm font-medium text-slate-300 mb-1.5">
+            Message <span className="text-slate-500">(optional)</span>
+          </label>
+          <textarea
+            id="message"
+            rows={3}
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="Tell us about your hiring needs..."
+            className="w-full rounded-lg px-4 py-3 bg-slate-800/50 border border-slate-700 text-white text-sm placeholder:text-slate-500 focus:outline-none focus:border-[#10B981] transition-colors resize-none"
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={submitting}
+          className="w-full rounded-xl px-8 py-4 bg-[#10B981] text-base font-bold shadow-lg shadow-[#10B981]/25 hover:shadow-[#10B981]/40 transition-shadow disabled:opacity-60"
+        >
+          {submitting ? "Submitting..." : "Request a Demo"}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function CTASection() {
+  const [showForm, setShowForm] = useState(false);
+
+  return (
+    <section id="cta" className="max-w-4xl mx-auto px-6 py-24">
+      <div className="relative rounded-2xl overflow-hidden">
+        {/* Gradient glow */}
+        <div className="absolute inset-0 bg-gradient-to-r from-[#10B981]/20 via-transparent to-[#10B981]/10 blur-xl" />
+        <div className="relative rounded-2xl border border-slate-800 bg-[#101122] p-10 md:p-16 text-center">
+          <h2 className="text-3xl md:text-4xl font-black mb-4">
+            Ready to see candidates in action?
+          </h2>
+          <p className="text-slate-400 max-w-xl mx-auto mb-10">
+            Join 200+ companies using SimWork to identify their next top
+            performers with objective simulation data.
+          </p>
+          {showForm ? (
+            <DemoForm onClose={() => setShowForm(false)} />
+          ) : (
+            <button
+              onClick={() => setShowForm(true)}
+              className="rounded-xl px-8 py-4 bg-[#10B981] text-base font-bold shadow-lg shadow-[#10B981]/25 hover:shadow-[#10B981]/40 transition-shadow"
+            >
+              Request a Demo
+            </button>
+          )}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -276,22 +318,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── CTA ── */}
-      <section id="cta" className="max-w-4xl mx-auto px-6 py-24">
-        <div className="relative rounded-2xl overflow-hidden">
-          {/* Gradient glow */}
-          <div className="absolute inset-0 bg-gradient-to-r from-[#10B981]/20 via-transparent to-[#10B981]/10 blur-xl" />
-          <div className="relative rounded-2xl border border-slate-800 bg-[#101122] p-10 md:p-16 text-center">
-            <h2 className="text-3xl md:text-4xl font-black mb-4">
-              Ready to see candidates in action?
-            </h2>
-            <p className="text-slate-400 max-w-xl mx-auto mb-10">
-              Join 200+ companies using SimWork to identify their next top
-              performers with objective simulation data.
-            </p>
-            <DemoForm />
-          </div>
-        </div>
-      </section>
+      <CTASection />
 
       {/* ── Footer ── */}
       <footer className="border-t border-slate-800 py-8 px-6">
