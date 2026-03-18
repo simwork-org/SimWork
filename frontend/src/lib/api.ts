@@ -254,6 +254,8 @@ export interface QueryLogDetail {
   }[];
   trace?: {
     intent?: string;
+    question_understanding?: string;
+    sub_questions?: string[];
     effective_query?: string | null;
     conversation_turns?: number;
     plan_complexity?: string;
@@ -262,6 +264,15 @@ export interface QueryLogDetail {
     total_duration_ms?: number;
     [key: string]: unknown;
   };
+  llm_calls?: {
+    stage: string;
+    step?: number;
+    system_prompt?: string;
+    user_payload?: Record<string, unknown>;
+    raw_response?: string;
+    parsed_result?: unknown;
+    duration_ms?: number;
+  }[];
   timestamp: string;
 }
 

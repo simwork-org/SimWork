@@ -107,8 +107,9 @@ def route_query(
     clarification_history = clarification_resolution["clarification_history"]
 
     _route_start_ms = time.monotonic()
+    all_llm_calls: list[dict[str, Any]] = []
     _emit("planning", "Understanding your question and planning investigation...")
-    plan, plan_warning = _plan_investigation(
+    plan, plan_warning, planner_llm_call = _plan_investigation(
         llm=llm,
         agent=agent,
         role=role,
@@ -119,6 +120,8 @@ def route_query(
         clarification_state=clarification_state,
         clarification_resolution=clarification_resolution,
     )
+    if planner_llm_call:
+        all_llm_calls.append(planner_llm_call)
     plan = _finalize_plan_clarification_state(
         plan=plan,
         original_query=original_query,
@@ -152,10 +155,11 @@ def route_query(
             "intent_class": "investigation",
             "_planner": plan,
             "_attempts": [],
+            "_llm_calls": all_llm_calls,
         }
 
     _emit("investigating", "Starting data investigation...")
-    evidence, attempts, warnings = _run_investigation_loop(
+    evidence, attempts, warnings, loop_llm_calls = _run_investigation_loop(
         llm=llm,
         scenario_id=scenario_id,
         agent=agent,
@@ -172,9 +176,10 @@ def route_query(
     if clarification_resolution.get("note"):
         warnings.append(clarification_resolution["note"])
 
+    all_llm_calls.extend(loop_llm_calls)
     _emit("synthesizing", "Composing final answer...")
     artifacts, citations = _build_artifacts_and_citations(evidence, agent)
-    response = _synthesize_response(
+    response, synth_llm_call = _synthesize_response(
         llm=llm,
         agent=agent,
         role=role,
@@ -185,9 +190,14 @@ def route_query(
         conversation_context=conversation_context,
     )
 
+    if synth_llm_call:
+        all_llm_calls.append(synth_llm_call)
+
     total_duration_ms = round((time.monotonic() - _route_start_ms) * 1000)
     trace = {
         "intent": query,
+        "question_understanding": plan.get("question_understanding", ""),
+        "sub_questions": plan.get("sub_questions", []),
         "effective_query": effective_query if effective_query != query else None,
         "conversation_turns": len(history),
         "clarification_asked": clarification_resolution.get("latest_reply"),
@@ -209,6 +219,7 @@ def route_query(
         "_planner": {**plan, "conversation_context_summary": conversation_context, "attempt_count": len(attempts)},
         "_attempts": attempts,
         "_trace": trace,
+        "_llm_calls": all_llm_calls,
     }
 
 
@@ -222,7 +233,7 @@ def _plan_investigation(
     conversation_context: list[dict[str, Any]],
     clarification_state: dict[str, Any],
     clarification_resolution: dict[str, Any],
-) -> tuple[dict[str, Any], str | None]:
+) -> tuple[dict[str, Any], str | None, dict[str, Any]]:
     system = _role_system_prompt(agent, role) + (
         "\n\nCreate a short investigation plan before querying data. "
         "Decide whether the question looks solvable with one query or needs multiple steps. "
@@ -239,7 +250,7 @@ def _plan_investigation(
         "always allow free-text clarification, and do not ask more questions if the clarification budget is exhausted. "
         "Return JSON only."
     )
-    plan, error = _chat_json(
+    plan, error, llm_call = _chat_json_traced(
         llm=llm,
         system=system,
         payload={
@@ -260,8 +271,8 @@ def _plan_investigation(
         purpose="planner",
     )
     if plan is not None:
-        return plan, None
-    return _generic_plan(source_metadata), f"Planner could not produce valid structured output: {error}"
+        return plan, None, llm_call
+    return _generic_plan(source_metadata), f"Planner could not produce valid structured output: {error}", llm_call
 
 
 def _run_investigation_loop(
@@ -274,10 +285,11 @@ def _run_investigation_loop(
     source_metadata: list[dict[str, Any]],
     conversation_context: list[dict[str, Any]],
     status_callback: Callable[[dict[str, str]], None] | None = None,
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[str]]:
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[str], list[dict[str, Any]]]:
     warnings: list[str] = []
     attempts: list[dict[str, Any]] = []
     evidence: list[dict[str, Any]] = []
+    llm_calls: list[dict[str, Any]] = []
     allowed_sql_tables = set(role.get("allowed_tables", []))
 
     def _emit(stage: str, detail: str = "") -> None:
@@ -286,7 +298,7 @@ def _run_investigation_loop(
 
     for attempt_no in range(1, MAX_INVESTIGATION_ATTEMPTS + 1):
         _emit("choosing_action", f"Attempt {attempt_no}: selecting next action...")
-        action, action_warning = _choose_next_action(
+        action, action_warning, action_llm_call = _choose_next_action(
             llm=llm,
             agent=agent,
             role=role,
@@ -297,6 +309,9 @@ def _run_investigation_loop(
             attempts=attempts,
             evidence=evidence,
         )
+        if action_llm_call:
+            action_llm_call["step"] = attempt_no
+            llm_calls.append(action_llm_call)
         if action_warning:
             warnings.append(action_warning)
 
@@ -336,9 +351,12 @@ def _run_investigation_loop(
         if record["status"] == "success" and record.get("rows"):
             # Critic check — validate result quality before accepting
             _emit("critic_review", f"Checking query quality (attempt {attempt_no})...")
-            is_ok, rejection_reason, suggested_fix = _critic_check(
+            is_ok, rejection_reason, suggested_fix, critic_llm_call = _critic_check(
                 llm=llm, query=query, action=action, record=record, plan=plan
             )
+            if critic_llm_call:
+                critic_llm_call["step"] = attempt_no
+                llm_calls.append(critic_llm_call)
             # Always record critic feedback on the attempt record
             record["critic_ok"] = is_ok
             if rejection_reason:
@@ -380,7 +398,7 @@ def _run_investigation_loop(
 
     if not evidence and attempts:
         warnings.append("The agent could not find strong evidence within the allowed attempt limit.")
-    return evidence, attempts, warnings
+    return evidence, attempts, warnings, llm_calls
 
 
 def _choose_next_action(
@@ -393,9 +411,9 @@ def _choose_next_action(
     conversation_context: list[dict[str, Any]],
     attempts: list[dict[str, Any]],
     evidence: list[dict[str, Any]],
-) -> tuple[dict[str, Any], str | None]:
+) -> tuple[dict[str, Any], str | None, dict[str, Any] | None]:
     if attempts and evidence:
-        return {"action": "finish", "reason": "We already have evidence.", "title": "Final answer", "answer_mode": "text"}, None
+        return {"action": "finish", "reason": "We already have evidence.", "title": "Final answer", "answer_mode": "text"}, None, None
 
     system = _role_system_prompt(agent, role) + (
         "\n\nYou are in an investigation loop. "
@@ -426,7 +444,7 @@ def _choose_next_action(
         "If you already have enough evidence, return action=finish. "
         "Return JSON only."
     )
-    action, error = _chat_json(
+    action, error, llm_call = _chat_json_traced(
         llm=llm,
         system=system,
         payload={
@@ -439,11 +457,11 @@ def _choose_next_action(
             "response_schema": ACTION_SCHEMA,
         },
         normalize=lambda value: _normalize_action(value, plan, source_metadata),
-        purpose="action selector",
+        purpose="action_chooser",
     )
     if action is not None:
-        return action, None
-    return {"action": "finish", "reason": "No valid next step could be produced.", "title": "Final answer", "answer_mode": "text"}, f"Action selection failed: {error}"
+        return action, None, llm_call
+    return {"action": "finish", "reason": "No valid next step could be produced.", "title": "Final answer", "answer_mode": "text"}, f"Action selection failed: {error}", llm_call
 
 
 def _execute_sql_step(
@@ -564,10 +582,10 @@ def _critic_check(
     action: dict[str, Any],
     record: dict[str, Any],
     plan: dict[str, Any],
-) -> tuple[bool, str | None, str | None]:
+) -> tuple[bool, str | None, str | None, dict[str, Any] | None]:
     """Review SQL/Python code for correctness before accepting results as evidence.
 
-    Returns (is_acceptable, rejection_reason, suggested_fix).
+    Returns (is_acceptable, rejection_reason, suggested_fix, llm_call_record).
     """
     columns = record.get("columns", [])
     sql = record.get("sql") or action.get("sql") or ""
@@ -606,29 +624,29 @@ def _critic_check(
         }
 
     try:
-        result, error = _chat_json(
+        result, error, llm_call = _chat_json_traced(
             llm=llm,
             system=system,
             payload=payload,
             normalize=_normalize_critic,
-            purpose="result critic",
+            purpose="critic",
         )
         if result is None:
             # If critic call fails, accept the result (don't block on critic errors)
             logger.warning("Critic check failed: %s — accepting result", error)
-            return True, None, None
+            return True, None, None, llm_call
 
         if result["acceptable"]:
             logger.info("Critic accepted: SQL looks correct for question")
-            return True, None, None
+            return True, None, None, llm_call
 
         reason = result["reason"] or "Result quality issue detected"
         fix = result["suggested_fix"] or None
         logger.info("Critic rejected: %s | Suggested fix: %s", reason, fix)
-        return False, reason, fix
+        return False, reason, fix, llm_call
     except Exception as exc:
         logger.warning("Critic check exception: %s — accepting result", exc)
-        return True, None, None
+        return True, None, None, None
 
 
 def _execute_document_step(
@@ -686,32 +704,40 @@ def _synthesize_response(
     evidence: list[dict[str, Any]],
     warnings: list[str],
     conversation_context: list[dict[str, Any]],
-) -> str:
+) -> tuple[str, dict[str, Any] | None]:
+    """Synthesize the final response. Returns (response_text, llm_call_record)."""
     if not evidence:
         if conversation_context:
             system = _role_system_prompt(agent, role) + (
                 "\n\nAnswer using the shared investigation context only. "
                 "Be clear that you are referencing earlier teammate findings rather than fresh data."
             )
-            user = json.dumps(
-                {
-                    "question": query,
-                    "plan": plan,
-                    "conversation_context": conversation_context,
-                    "warnings": warnings,
-                },
-                ensure_ascii=True,
-            )
+            user_payload = {
+                "question": query,
+                "plan": plan,
+                "conversation_context": conversation_context,
+                "warnings": warnings,
+            }
+            user = json.dumps(user_payload, ensure_ascii=True)
+            _start = time.monotonic()
             try:
                 text = llm.chat_text(system=system, user=user).strip()
+                llm_call = {
+                    "stage": "synthesizer",
+                    "system_prompt": system[:500],
+                    "user_payload": _truncate_payload(user_payload),
+                    "raw_response": text[:2000],
+                    "parsed_result": None,
+                    "duration_ms": round((time.monotonic() - _start) * 1000),
+                }
                 if text:
-                    return text
+                    return text, llm_call
             except Exception as exc:
                 logger.warning("Shared-context synthesis failed: %s", exc)
         bounded_warning = next((warning for warning in reversed(warnings) if "attempt limit" in warning.lower()), None)
         if warnings:
-            return bounded_warning or warnings[0]
-        return "I could not find enough evidence in my allowed sources to answer that."
+            return (bounded_warning or warnings[0]), None
+        return "I could not find enough evidence in my allowed sources to answer that.", None
 
     system = _role_system_prompt(agent, role) + (
         "\n\nWrite a concise (3-4 lines), evidence-grounded answer with specific numbers from the data. "
@@ -735,23 +761,30 @@ def _synthesize_response(
                 entry["data_note"] = f"Showing first 30 of {len(rows)} rows"
         evidence_for_llm.append(entry)
 
-    user = json.dumps(
-        {
-            "question": query,
-            "plan": plan,
-            "evidence": evidence_for_llm,
-            "warnings": warnings,
-            "conversation_context": conversation_context,
-        },
-        ensure_ascii=True,
-    )
+    user_payload = {
+        "question": query,
+        "plan": plan,
+        "evidence": evidence_for_llm,
+        "warnings": warnings,
+        "conversation_context": conversation_context,
+    }
+    user = json.dumps(user_payload, ensure_ascii=True)
+    _start = time.monotonic()
     try:
         text = llm.chat_text(system=system, user=user).strip()
+        llm_call = {
+            "stage": "synthesizer",
+            "system_prompt": system[:500],
+            "user_payload": _truncate_payload(user_payload),
+            "raw_response": text[:2000],
+            "parsed_result": None,
+            "duration_ms": round((time.monotonic() - _start) * 1000),
+        }
         if text:
-            return text
+            return text, llm_call
     except Exception as exc:
         logger.warning("Synthesis failed, using deterministic summary: %s", exc)
-    return " ".join(item["summary"] for item in evidence if item.get("summary")).strip()
+    return " ".join(item["summary"] for item in evidence if item.get("summary")).strip(), None
 
 
 def _role_system_prompt(agent: str, role: dict[str, Any]) -> str:
@@ -1440,3 +1473,63 @@ def _chat_json(
                 "instruction": "Return a valid JSON object that matches the response schema.",
             }
     return None, latest_error
+
+
+def _chat_json_traced(
+    llm: LLMClient,
+    system: str,
+    payload: dict[str, Any],
+    normalize: Any,
+    purpose: str,
+) -> tuple[dict[str, Any] | None, str | None, dict[str, Any]]:
+    """Like _chat_json but also returns an LLM call trace record."""
+    latest_error: str | None = None
+    current_payload = dict(payload)
+    raw_response = ""
+    _start = time.monotonic()
+    for attempt in range(2):
+        try:
+            user_str = json.dumps(current_payload, ensure_ascii=True)
+            value, raw_response = llm.chat_raw(system=system, user=user_str)
+            if not isinstance(value, dict):
+                raise ValueError(f"{purpose} did not return a JSON object.")
+            normalized = normalize(value)
+            call_record = {
+                "stage": purpose,
+                "system_prompt": system[:500],
+                "user_payload": _truncate_payload(payload),
+                "raw_response": raw_response[:2000],
+                "parsed_result": _truncate_payload(normalized),
+                "duration_ms": round((time.monotonic() - _start) * 1000),
+            }
+            return normalized, None, call_record
+        except Exception as exc:
+            latest_error = str(exc)
+            logger.warning("%s attempt %s failed: %s", purpose.title(), attempt + 1, exc)
+            current_payload = {
+                **payload,
+                "previous_error": latest_error,
+                "instruction": "Return a valid JSON object that matches the response schema.",
+            }
+    call_record = {
+        "stage": purpose,
+        "system_prompt": system[:500],
+        "user_payload": _truncate_payload(payload),
+        "raw_response": raw_response[:2000] if raw_response else f"Error: {latest_error}",
+        "parsed_result": None,
+        "duration_ms": round((time.monotonic() - _start) * 1000),
+    }
+    return None, latest_error, call_record
+
+
+def _truncate_payload(obj: Any, max_str: int = 500) -> Any:
+    """Truncate large string values in dicts/lists for trace storage."""
+    if isinstance(obj, dict):
+        return {k: _truncate_payload(v, max_str) for k, v in obj.items()}
+    if isinstance(obj, list):
+        if len(obj) > 10:
+            return [_truncate_payload(item, max_str) for item in obj[:10]] + [f"... ({len(obj) - 10} more)"]
+        return [_truncate_payload(item, max_str) for item in obj]
+    if isinstance(obj, str) and len(obj) > max_str:
+        return obj[:max_str] + "..."
+    return obj

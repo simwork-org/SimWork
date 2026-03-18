@@ -750,6 +750,60 @@ function TraceStep({
   );
 }
 
+interface LLMCallRecord {
+  stage: string;
+  step?: number;
+  system_prompt?: string;
+  user_payload?: Record<string, unknown>;
+  raw_response?: string;
+  parsed_result?: unknown;
+  duration_ms?: number;
+}
+
+function RawLLMCalls({ calls }: { calls: LLMCallRecord[] }) {
+  const [open, setOpen] = useState(false);
+  if (!calls.length) return null;
+  return (
+    <div className="mt-2">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-1.5 text-[10px] text-slate-400 hover:text-emerald-500 transition-colors group"
+      >
+        <span className="material-symbols-outlined text-[13px]" style={{ transform: open ? "rotate(90deg)" : undefined, transition: "transform 0.15s" }}>
+          chevron_right
+        </span>
+        Raw LLM I/O ({calls.length} call{calls.length > 1 ? "s" : ""})
+      </button>
+      {open && (
+        <div className="mt-2 space-y-3">
+          {calls.map((call, i) => (
+            <div key={i} className="rounded-lg bg-slate-900 dark:bg-slate-950 border border-slate-700/50 overflow-hidden">
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-800/50 border-b border-slate-700/30">
+                <span className="text-[10px] font-mono text-emerald-400">{call.stage}</span>
+                {call.duration_ms !== undefined && <span className="text-[9px] text-slate-500 font-mono">{call.duration_ms}ms</span>}
+              </div>
+              <div className="p-2 space-y-1.5">
+                <details className="group">
+                  <summary className="text-[10px] text-slate-400 cursor-pointer hover:text-slate-300 select-none">System prompt</summary>
+                  <pre className="mt-1 text-[9px] text-slate-400 font-mono whitespace-pre-wrap max-h-40 overflow-y-auto p-2 bg-slate-950 rounded">{call.system_prompt || "—"}</pre>
+                </details>
+                <details className="group">
+                  <summary className="text-[10px] text-slate-400 cursor-pointer hover:text-slate-300 select-none">Payload</summary>
+                  <pre className="mt-1 text-[9px] text-sky-400 font-mono whitespace-pre-wrap max-h-60 overflow-y-auto p-2 bg-slate-950 rounded">{JSON.stringify(call.user_payload, null, 2) || "—"}</pre>
+                </details>
+                <details className="group">
+                  <summary className="text-[10px] text-slate-400 cursor-pointer hover:text-slate-300 select-none">Response</summary>
+                  <pre className="mt-1 text-[9px] text-amber-400 font-mono whitespace-pre-wrap max-h-60 overflow-y-auto p-2 bg-slate-950 rounded">{call.raw_response || "—"}</pre>
+                </details>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function QueryLogModal({
   sessionId,
   queryLogId,
@@ -811,16 +865,38 @@ function QueryLogModal({
             <div className="space-y-0">
               {/* Step 1: Intent */}
               <TraceStep icon="record_voice_over" label="Intent" badge={detail.trace?.conversation_turns ? `${detail.trace.conversation_turns} prior turns` : undefined} defaultOpen>
-                <div className="rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 p-3 text-[12px] text-slate-600 dark:text-slate-300">
-                  <p className="font-medium mb-1">Query</p>
-                  <p className="text-slate-500 dark:text-slate-400 italic">&ldquo;{detail.query}&rdquo;</p>
+                <div className="rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 p-3 text-[12px] text-slate-600 dark:text-slate-300 space-y-2">
+                  <div>
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">Query</p>
+                    <p className="text-slate-500 dark:text-slate-400 italic">&ldquo;{detail.query}&rdquo;</p>
+                  </div>
                   {detail.trace?.effective_query && detail.trace.effective_query !== detail.query && (
-                    <>
-                      <p className="font-medium mt-2 mb-1">Resolved query</p>
+                    <div>
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">Resolved query</p>
                       <p className="text-slate-500 dark:text-slate-400 italic">&ldquo;{detail.trace.effective_query}&rdquo;</p>
-                    </>
+                    </div>
+                  )}
+                  {detail.trace?.question_understanding && (
+                    <div className="rounded bg-emerald-500/8 dark:bg-emerald-500/10 border-l-2 border-emerald-500 px-3 py-2">
+                      <p className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-0.5">Understood as</p>
+                      <p className="text-slate-700 dark:text-slate-200">{detail.trace.question_understanding}</p>
+                    </div>
+                  )}
+                  {detail.trace?.sub_questions && (detail.trace.sub_questions as string[]).length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Sub-questions</p>
+                      <ul className="space-y-0.5">
+                        {(detail.trace.sub_questions as string[]).map((sq, i) => (
+                          <li key={i} className="flex items-start gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                            <span className="text-emerald-500 mt-0.5">•</span>
+                            {sq}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   )}
                 </div>
+                <RawLLMCalls calls={(detail.llm_calls || []).filter((c: LLMCallRecord) => c.stage === "planner")} />
               </TraceStep>
 
               {/* Step 2: Plan */}
@@ -833,14 +909,14 @@ function QueryLogModal({
                   defaultOpen
                 >
                   <div className="rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 p-3 space-y-2 text-[12px]">
-                    {detail.planner.question_understanding && (
-                      <p className="text-slate-600 dark:text-slate-300">{detail.planner.question_understanding as string}</p>
-                    )}
                     {detail.planner.target_tables && (detail.planner.target_tables as string[]).length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {(detail.planner.target_tables as string[]).map((t) => (
-                          <span key={t} className="px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-mono">{t}</span>
-                        ))}
+                      <div>
+                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Target tables</p>
+                        <div className="flex flex-wrap gap-1">
+                          {(detail.planner.target_tables as string[]).map((t) => (
+                            <span key={t} className="px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-mono">{t}</span>
+                          ))}
+                        </div>
                       </div>
                     )}
                     {detail.planner.stop_condition && (
@@ -858,11 +934,6 @@ function QueryLogModal({
                 const rowsLabel = attempt.rows_returned !== undefined ? `${attempt.rows_returned} rows` : undefined;
                 const badge = [attempt.kind, durationLabel, rowsLabel].filter(Boolean).join(" · ");
                 const criticIcon = isSuccess ? "check_circle" : isRejected ? "warning" : "error";
-                const criticColor = isSuccess
-                  ? "text-emerald-500"
-                  : isRejected
-                  ? "text-amber-500"
-                  : "text-red-500";
                 return (
                   <TraceStep
                     key={i}
@@ -885,21 +956,31 @@ function QueryLogModal({
                       {attempt.error && (
                         <p className="text-[11px] text-red-500 bg-red-500/10 rounded p-2">{attempt.error}</p>
                       )}
-                      {isRejected && attempt.rejection_reason && (
+                      {/* Critic verdict — shown for all attempts where critic ran */}
+                      {attempt.critic_ok === true && (
+                        <div className="flex items-center gap-1.5 text-[11px] text-emerald-500">
+                          <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                          <span className="font-medium">Critic accepted</span>
+                        </div>
+                      )}
+                      {attempt.critic_ok === false && (
                         <div className="rounded bg-amber-500/10 border border-amber-500/20 p-2">
-                          <p className={`text-[11px] font-semibold ${criticColor} mb-1`}>Critic rejected</p>
-                          <p className="text-[11px] text-slate-600 dark:text-slate-400">{String(attempt.rejection_reason)}</p>
+                          <div className="flex items-center gap-1.5 text-[11px] text-amber-500 font-medium mb-1">
+                            <span className="material-symbols-outlined text-[14px]">warning</span>
+                            Critic rejected
+                          </div>
+                          {attempt.rejection_reason && (
+                            <p className="text-[11px] text-slate-600 dark:text-slate-400">{String(attempt.rejection_reason)}</p>
+                          )}
                           {attempt.suggested_fix && (
                             <p className="mt-1 text-[11px] text-amber-500/80">Fix: {String(attempt.suggested_fix)}</p>
                           )}
                         </div>
                       )}
-                      {isSuccess && attempt.critic_reason && (
-                        <p className="text-[11px] text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 rounded p-2">{String(attempt.critic_reason)}</p>
-                      )}
                       {attempt.summary && (
                         <p className="text-[11px] text-slate-500 dark:text-slate-400">{attempt.summary}</p>
                       )}
+                      <RawLLMCalls calls={(detail.llm_calls || []).filter((c: LLMCallRecord) => (c.stage === "action_chooser" || c.stage === "critic") && c.step === (attempt.attempt || i + 1))} />
                     </div>
                   </TraceStep>
                 );
@@ -907,9 +988,20 @@ function QueryLogModal({
 
               {/* Final: Response */}
               <TraceStep icon="chat" label="Response" badge={`${detail.artifacts.length} artifact${detail.artifacts.length !== 1 ? "s" : ""}`} defaultOpen>
-                <div className="rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 p-3 text-[12px] text-slate-600 dark:text-slate-300">
-                  {detail.response}
+                <div className="rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 p-3 text-[12px] text-slate-600 dark:text-slate-300 space-y-2">
+                  <p className="whitespace-pre-wrap">{detail.response}</p>
+                  {detail.warnings.length > 0 && (
+                    <div className="space-y-1 pt-1 border-t border-slate-200 dark:border-slate-700">
+                      {detail.warnings.map((w, wi) => (
+                        <div key={wi} className="flex items-start gap-1.5 text-[11px] text-amber-500">
+                          <span className="material-symbols-outlined text-[13px] mt-0.5">warning</span>
+                          <span>{w}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
+                <RawLLMCalls calls={(detail.llm_calls || []).filter((c: LLMCallRecord) => c.stage === "synthesizer")} />
               </TraceStep>
 
               {detail.attempts.length === 0 && (!detail.planner || Object.keys(detail.planner).length === 0) && (
@@ -1153,6 +1245,16 @@ function SavedEvidenceCard({
       </div>
     </div>
   );
+}
+
+function _humanizeWarning(warning: string): string {
+  const lower = warning.toLowerCase();
+  if (lower.includes("unauthorized table access")) return "I don't have access to that data source.";
+  if (lower.includes("no such column")) return "The query referenced a column that doesn't exist.";
+  if (lower.includes("could not find strong evidence")) return "I searched the available data but couldn't find relevant results.";
+  if (lower.includes("returned no rows")) return "The query ran but returned no matching records.";
+  if (lower.includes("syntax error")) return "There was a syntax error in the generated query.";
+  return warning.length > 120 ? warning.slice(0, 120) + "..." : warning;
 }
 
 export default function WorkspacePage() {
@@ -1566,13 +1668,25 @@ export default function WorkspacePage() {
                         />
                       );
                     })}
-                    {message.role === "agent" && !!message.warnings?.length && (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {message.warnings.map((warning, index) => (
-                          <span key={`${message.id}-warning-${index}`} className="px-2 py-1 rounded-full bg-red-500/10 text-[10px] text-red-500">
-                            {warning}
-                          </span>
-                        ))}
+                    {/* Show failure card when warnings exist but no artifacts */}
+                    {message.role === "agent" && !!message.warnings?.length && !message.artifacts?.length && (
+                      <div className="mt-3 rounded-lg bg-amber-500/8 dark:bg-amber-500/10 border border-amber-500/20 p-3">
+                        <div className="flex items-center gap-1.5 mb-1.5">
+                          <span className="material-symbols-outlined text-amber-500 text-[16px]">warning</span>
+                          <span className="text-[12px] font-semibold text-amber-600 dark:text-amber-400">Couldn&apos;t complete this query</span>
+                        </div>
+                        <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed mb-2">
+                          {_humanizeWarning(message.warnings[0])}
+                        </p>
+                        {message.queryLogId && (
+                          <button
+                            onClick={() => setLogModalQueryId(message.queryLogId!)}
+                            className="flex items-center gap-1 text-[10px] font-medium text-amber-600 dark:text-amber-400 hover:text-amber-500"
+                          >
+                            <span className="material-symbols-outlined text-sm">code</span>
+                            View Log for full details
+                          </button>
+                        )}
                       </div>
                     )}
                     {message.role === "agent" && message.queryLogId && (

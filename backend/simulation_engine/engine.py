@@ -134,6 +134,7 @@ def handle_query(
     planner = result.pop("_planner", None)
     attempts = result.pop("_attempts", None)
     trace = result.pop("_trace", None)
+    llm_calls = result.pop("_llm_calls", None)
     query_log_id = log_query(
         session_id,
         agent,
@@ -145,6 +146,7 @@ def handle_query(
         planner=planner,
         attempts=attempts,
         trace=trace,
+        llm_calls=llm_calls,
     )
     log_session_event(
         session_id,
