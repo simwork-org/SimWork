@@ -404,4 +404,9 @@ def api_claim_invite(token: str, user: dict = Depends(get_current_user)):
         assessment_id=invite["assessment_id"],
         invite_token=token,
     )
-    return {"session_id": session_data["session_id"], "claimed": True}
+    return {
+        "session_id": session_data["session_id"],
+        "claimed": True,
+        "company_name": invite.get("company_name"),
+        "assessment_title": invite.get("assessment_title"),
+    }

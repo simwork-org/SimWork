@@ -566,6 +566,6 @@ export async function validateInvite(token: string): Promise<InviteValidation> {
   return fetchJSON(`${PREFIX}/invite/${token}`);
 }
 
-export async function claimInvite(token: string): Promise<{ session_id: string; claimed: boolean }> {
+export async function claimInvite(token: string): Promise<{ session_id: string; claimed: boolean; company_name?: string; assessment_title?: string }> {
   return fetchJSON(`${PREFIX}/invite/${token}/claim`, { method: "POST" });
 }

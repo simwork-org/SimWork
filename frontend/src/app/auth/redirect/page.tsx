@@ -35,12 +35,16 @@ export default function AuthRedirectPage() {
           await setMyRole("company");
         }
 
-        // If there's a pending invite, claim it and go to workspace
+        // If there's a pending invite, claim it and go to briefing
         if (pendingInvite) {
-          setStatus("Starting your assessment...");
+          setStatus("Preparing your assessment...");
           try {
             const result = await claimInvite(pendingInvite);
-            router.replace(`/workspace/${result.session_id}`);
+            // Store company name for the briefing page
+            if (result.company_name) {
+              document.cookie = `simwork_company=${encodeURIComponent(result.company_name)};path=/;max-age=600`;
+            }
+            router.replace(`/briefing/${result.session_id}`);
             return;
           } catch {
             // Invite may be invalid/used — fall through to normal routing
