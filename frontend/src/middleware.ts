@@ -3,8 +3,8 @@ import { NextResponse } from "next/server";
 
 export default auth((req) => {
   if (!req.auth && req.nextUrl.pathname !== "/login") {
-    const loginUrl = new URL("/login", req.url);
-    return NextResponse.redirect(loginUrl);
+    const landingUrl = new URL("/landing", req.url);
+    return NextResponse.redirect(landingUrl);
   }
   return NextResponse.next();
 });
