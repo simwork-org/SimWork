@@ -252,10 +252,6 @@ export default function LandingPage() {
               See How It Works
             </a>
           </div>
-
-          <p className="text-sm text-slate-500">
-            No integration required. First assessment in under 5 minutes.
-          </p>
         </div>
       </section>
 
