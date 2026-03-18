@@ -333,13 +333,14 @@ function LineChart({ artifact }: { artifact: Extract<Artifact, { kind: "chart" }
   const padTop = 12;
   const padBottom = 38;
 
-  // Dual Y-axis only for multi-measure charts (different columns) with significantly different scales
+  // Dual Y-axis: triggered by explicit dual_axis flag from backend OR by multi-measure with very different scales
   const seriesMaxes = artifact.series.map((s) => Math.max(...s.values, 1));
   const overallMax = Math.max(...seriesMaxes);
   const overallMin = Math.min(...seriesMaxes);
-  const needsDualAxis = artifact.multi_measure === true
-    && artifact.series.length >= 2
-    && overallMax / Math.max(overallMin, 1) > 10;
+  const needsDualAxis = (artifact.dual_axis === true)
+    || (artifact.multi_measure === true
+      && artifact.series.length >= 2
+      && overallMax / Math.max(overallMin, 1) > 10);
 
   const padRight = needsDualAxis ? 52 : 16;
   const plotWidth = width - padLeft - padRight;
@@ -519,6 +520,164 @@ function FunnelChart({ artifact }: { artifact: Extract<Artifact, { kind: "chart"
   );
 }
 
+function PieChart({ artifact }: { artifact: Extract<Artifact, { kind: "chart" }> }) {
+  const series = artifact.series[0];
+  if (!series || artifact.labels.length === 0) return null;
+  const total = series.values.reduce((sum, v) => sum + Math.abs(v), 0) || 1;
+  const palette = ["#10B981", "#38BDF8", "#F59E0B", "#A855F7", "#EC4899", "#EF4444", "#F97316", "#84CC16"];
+  const size = 140;
+  const cx = size / 2;
+  const cy = size / 2;
+  const r = 52;
+  const slices = series.values.reduce<{ path: string; color: string; label: string; value: number; pct: number; angle: number }[]>((acc, value, index) => {
+    const prevAngle = acc.length > 0 ? acc[acc.length - 1].angle : -Math.PI / 2;
+    const pct = Math.abs(value) / total;
+    const sweep = pct * 2 * Math.PI;
+    const endAngle = prevAngle + sweep;
+    const x1 = cx + r * Math.cos(prevAngle);
+    const y1 = cy + r * Math.sin(prevAngle);
+    const x2 = cx + r * Math.cos(endAngle);
+    const y2 = cy + r * Math.sin(endAngle);
+    const largeArc = sweep > Math.PI ? 1 : 0;
+    const path = `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`;
+    return [...acc, { path, color: palette[index % palette.length], label: artifact.labels[index], value, pct, angle: endAngle }];
+  }, []);
+  return (
+    <div className="flex items-center gap-4">
+      <svg viewBox={`0 0 ${size} ${size}`} className="w-32 shrink-0">
+        {slices.map((slice, index) => (
+          <path key={index} d={slice.path} fill={slice.color} opacity={0.85} />
+        ))}
+      </svg>
+      <div className="flex flex-col gap-1">
+        {slices.map((slice, index) => (
+          <div key={index} className="flex items-center gap-2 text-[11px] text-slate-600 dark:text-slate-400">
+            <span className="size-2 rounded-full shrink-0" style={{ backgroundColor: slice.color }} />
+            <span className="truncate max-w-[120px]">{slice.label}</span>
+            <span className="font-mono text-slate-500">{Math.round(slice.pct * 100)}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ScatterChart({ artifact }: { artifact: Extract<Artifact, { kind: "chart" }> }) {
+  if (artifact.series.length < 2 || artifact.series[0].values.length === 0) return <BarChart artifact={artifact} />;
+  const xSeries = artifact.series[0];
+  const ySeries = artifact.series[1];
+  const xs = xSeries.values;
+  const ys = ySeries.values;
+  const n = Math.min(xs.length, ys.length);
+  const xMin = Math.min(...xs), xMax = Math.max(...xs, xMin + 1);
+  const yMin = Math.min(...ys), yMax = Math.max(...ys, yMin + 1);
+  const width = 360, height = 200, padLeft = 44, padBottom = 30, padTop = 12, padRight = 12;
+  const plotWidth = width - padLeft - padRight;
+  const plotHeight = height - padTop - padBottom;
+  const toX = (v: number) => padLeft + ((v - xMin) / (xMax - xMin)) * plotWidth;
+  const toY = (v: number) => padTop + (1 - (v - yMin) / (yMax - yMin)) * plotHeight;
+  const yTicks = Array.from({ length: 5 }, (_, i) => yMin + ((4 - i) / 4) * (yMax - yMin));
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} className="w-full" style={{ aspectRatio: `${width}/${height}` }}>
+      {yTicks.map((tick, i) => (
+        <g key={i}>
+          <line x1={padLeft} x2={width - padRight} y1={toY(tick)} y2={toY(tick)} stroke="currentColor" className="text-slate-800/10 dark:text-white/10" />
+          <text x={padLeft - 5} y={toY(tick) + 4} textAnchor="end" fontSize={9} className="fill-slate-500">{formatChartAxisValue(tick, artifact.unit)}</text>
+        </g>
+      ))}
+      <line x1={padLeft} x2={width - padRight} y1={height - padBottom} y2={height - padBottom} stroke="currentColor" className="text-slate-800/20 dark:text-white/10" />
+      {Array.from({ length: n }, (_, i) => (
+        <circle key={i} cx={toX(xs[i])} cy={toY(ys[i])} r={3} fill="#10B981" opacity={0.65} />
+      ))}
+      <text x={padLeft + plotWidth / 2} y={height - 4} textAnchor="middle" fontSize={9} className="fill-slate-500">{xSeries.name}</text>
+      <text x={10} y={padTop + plotHeight / 2} textAnchor="middle" fontSize={9} className="fill-slate-500" transform={`rotate(-90, 10, ${padTop + plotHeight / 2})`}>{ySeries.name}</text>
+    </svg>
+  );
+}
+
+function HeatmapChart({ artifact }: { artifact: Extract<Artifact, { kind: "chart" }> }) {
+  if (artifact.series.length === 0 || artifact.labels.length === 0) return null;
+  const allValues = artifact.series.flatMap((s) => s.values);
+  const minVal = Math.min(...allValues);
+  const maxVal = Math.max(...allValues, minVal + 1);
+  const toOpacity = (v: number) => 0.1 + 0.9 * ((v - minVal) / (maxVal - minVal));
+  return (
+    <div className="overflow-x-auto">
+      <table className="text-[10px] border-collapse">
+        <thead>
+          <tr>
+            <th className="px-2 py-1 text-slate-400"></th>
+            {artifact.labels.map((label) => (
+              <th key={label} className="px-2 py-1 text-slate-500 font-normal max-w-[60px] truncate">{shortenDateLabel(label)}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {artifact.series.map((s) => (
+            <tr key={s.name}>
+              <td className="px-2 py-1 text-slate-500 text-right font-medium whitespace-nowrap">{s.name}</td>
+              {s.values.map((v, i) => (
+                <td key={i} className="px-1 py-1 text-center font-mono text-slate-800 dark:text-white" style={{ backgroundColor: `rgba(16,185,129,${toOpacity(v)})` }}>
+                  {formatChartAxisValue(v, artifact.unit)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function HistogramChart({ artifact }: { artifact: Extract<Artifact, { kind: "chart" }> }) {
+  // Histogram is a bar chart — buckets are just bars
+  return <BarChart artifact={artifact} />;
+}
+
+function BoxPlotChart({ artifact }: { artifact: Extract<Artifact, { kind: "chart" }> }) {
+  // Expects series with 5 values each: [min, Q1, median, Q3, max]
+  const palette = ["#10B981", "#38BDF8", "#F59E0B", "#A855F7", "#EC4899"];
+  const allVals = artifact.series.flatMap((s) => s.values);
+  const globalMin = Math.min(...allVals);
+  const globalMax = Math.max(...allVals, globalMin + 1);
+  const width = 300;
+  const height = 160;
+  const padLeft = 48;
+  const padRight = 16;
+  const padTop = 12;
+  const padBottom = 28;
+  const plotWidth = width - padLeft - padRight;
+  const plotHeight = height - padTop - padBottom;
+  const toX = (v: number) => padLeft + ((v - globalMin) / (globalMax - globalMin)) * plotWidth;
+  const boxHeight = Math.max(12, Math.floor(plotHeight / artifact.series.length) - 6);
+  const ticks = Array.from({ length: 5 }, (_, i) => globalMin + (i / 4) * (globalMax - globalMin));
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} className="w-full" style={{ aspectRatio: `${width}/${height}` }}>
+      {ticks.map((tick, i) => (
+        <g key={i}>
+          <line x1={toX(tick)} x2={toX(tick)} y1={padTop} y2={height - padBottom} stroke="currentColor" className="text-slate-800/10 dark:text-white/10" strokeDasharray="3 3" />
+          <text x={toX(tick)} y={height - padBottom + 14} textAnchor="middle" fontSize={9} className="fill-slate-500">{formatChartAxisValue(tick, artifact.unit)}</text>
+        </g>
+      ))}
+      {artifact.series.map((s, si) => {
+        const [vMin, q1, median, q3, vMax] = s.values.length >= 5 ? s.values : [s.values[0], s.values[0], s.values[0], s.values[0], s.values[0]];
+        const cy = padTop + si * (boxHeight + 6) + boxHeight / 2;
+        const color = palette[si % palette.length];
+        return (
+          <g key={s.name}>
+            <text x={padLeft - 4} y={cy + 4} textAnchor="end" fontSize={9} className="fill-slate-500">{s.name}</text>
+            <line x1={toX(vMin)} x2={toX(vMax)} y1={cy} y2={cy} stroke={color} strokeWidth={1.5} opacity={0.5} />
+            <line x1={toX(vMin)} x2={toX(vMin)} y1={cy - 5} y2={cy + 5} stroke={color} strokeWidth={1.5} />
+            <line x1={toX(vMax)} x2={toX(vMax)} y1={cy - 5} y2={cy + 5} stroke={color} strokeWidth={1.5} />
+            <rect x={toX(q1)} y={cy - boxHeight / 2} width={toX(q3) - toX(q1)} height={boxHeight} fill={color} opacity={0.2} stroke={color} strokeWidth={1.5} rx={2} />
+            <line x1={toX(median)} x2={toX(median)} y1={cy - boxHeight / 2} y2={cy + boxHeight / 2} stroke={color} strokeWidth={2.5} />
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
 function TableArtifactView({ artifact }: { artifact: Extract<Artifact, { kind: "table" }> }) {
   const numericColumns = new Set(artifact.columns.filter((column) => artifact.rows.some((row) => typeof row[column] === "number")));
   const monospaceColumns = new Set(
@@ -554,6 +713,43 @@ function TableArtifactView({ artifact }: { artifact: Extract<Artifact, { kind: "
   );
 }
 
+function TraceStep({
+  icon, label, badge, badgeColor, children, defaultOpen = false,
+}: {
+  icon: string; label: string; badge?: string; badgeColor?: string; children?: React.ReactNode; defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="relative pl-8">
+      {/* vertical line */}
+      <div className="absolute left-[11px] top-6 bottom-0 w-px bg-slate-200 dark:bg-slate-700" />
+      {/* dot */}
+      <div className="absolute left-0 top-[14px] size-[22px] rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center">
+        <span className="material-symbols-outlined text-[13px] text-emerald-500">{icon}</span>
+      </div>
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center gap-2 py-3 text-left group"
+      >
+        <span className="text-[12px] font-semibold text-slate-700 dark:text-slate-200">{label}</span>
+        {badge && (
+          <span className={`px-1.5 py-0.5 rounded text-[9px] font-mono ${badgeColor || "bg-slate-200 dark:bg-slate-700 text-slate-500"}`}>
+            {badge}
+          </span>
+        )}
+        {children && (
+          <span className="ml-auto material-symbols-outlined text-[14px] text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-transform" style={{ transform: open ? "rotate(180deg)" : undefined }}>
+            expand_more
+          </span>
+        )}
+      </button>
+      {open && children && (
+        <div className="pb-3">{children}</div>
+      )}
+    </div>
+  );
+}
+
 function QueryLogModal({
   sessionId,
   queryLogId,
@@ -583,136 +779,143 @@ function QueryLogModal({
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col border border-slate-200 dark:border-slate-800"
+        className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col border border-slate-200 dark:border-slate-800"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
           <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-            <span className="material-symbols-outlined text-emerald-500 text-lg">code</span>
-            Agent Execution Log
+            <span className="material-symbols-outlined text-emerald-500 text-lg">account_tree</span>
+            Agent Execution Trace
           </h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
-            <span className="material-symbols-outlined text-lg">close</span>
-          </button>
+          <div className="flex items-center gap-3">
+            {detail?.trace?.total_duration_ms && (
+              <span className="text-[11px] text-slate-400 font-mono">{detail.trace.total_duration_ms}ms total</span>
+            )}
+            <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+              <span className="material-symbols-outlined text-lg">close</span>
+            </button>
+          </div>
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
+        <div className="flex-1 overflow-y-auto px-4 py-4">
           {!detail && (
             <div className="flex items-center justify-center py-10 text-slate-400 text-sm">
               <span className="material-symbols-outlined animate-spin mr-2">progress_activity</span>
-              Loading execution log...
+              Loading trace...
             </div>
           )}
 
           {detail && (
-            <>
-              {/* Planner */}
+            <div className="space-y-0">
+              {/* Step 1: Intent */}
+              <TraceStep icon="record_voice_over" label="Intent" badge={detail.trace?.conversation_turns ? `${detail.trace.conversation_turns} prior turns` : undefined} defaultOpen>
+                <div className="rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 p-3 text-[12px] text-slate-600 dark:text-slate-300">
+                  <p className="font-medium mb-1">Query</p>
+                  <p className="text-slate-500 dark:text-slate-400 italic">&ldquo;{detail.query}&rdquo;</p>
+                  {detail.trace?.effective_query && detail.trace.effective_query !== detail.query && (
+                    <>
+                      <p className="font-medium mt-2 mb-1">Resolved query</p>
+                      <p className="text-slate-500 dark:text-slate-400 italic">&ldquo;{detail.trace.effective_query}&rdquo;</p>
+                    </>
+                  )}
+                </div>
+              </TraceStep>
+
+              {/* Step 2: Plan */}
               {detail.planner && Object.keys(detail.planner).length > 0 && (
-                <div>
-                  <h4 className="text-[11px] font-bold uppercase tracking-wider text-emerald-500 mb-2">Query Planner</h4>
-                  <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-3 space-y-2 text-[12px]">
+                <TraceStep
+                  icon="lightbulb"
+                  label="Plan"
+                  badge={detail.planner.complexity as string | undefined}
+                  badgeColor={detail.planner.complexity === "multi_step" ? "bg-amber-500/15 text-amber-600 dark:text-amber-400" : "bg-slate-200 dark:bg-slate-700 text-slate-500"}
+                  defaultOpen
+                >
+                  <div className="rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 p-3 space-y-2 text-[12px]">
                     {detail.planner.question_understanding && (
-                      <div>
-                        <span className="font-semibold text-slate-600 dark:text-slate-300">Understanding: </span>
-                        <span className="text-slate-500 dark:text-slate-400">{detail.planner.question_understanding}</span>
-                      </div>
+                      <p className="text-slate-600 dark:text-slate-300">{detail.planner.question_understanding as string}</p>
                     )}
-                    {detail.planner.complexity && (
-                      <div>
-                        <span className="font-semibold text-slate-600 dark:text-slate-300">Complexity: </span>
-                        <span className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-[10px] font-mono">
-                          {detail.planner.complexity}
-                        </span>
-                      </div>
-                    )}
-                    {detail.planner.target_tables && detail.planner.target_tables.length > 0 && (
-                      <div>
-                        <span className="font-semibold text-slate-600 dark:text-slate-300">Target tables: </span>
-                        <span className="text-slate-500 dark:text-slate-400">{detail.planner.target_tables.join(", ")}</span>
+                    {detail.planner.target_tables && (detail.planner.target_tables as string[]).length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {(detail.planner.target_tables as string[]).map((t) => (
+                          <span key={t} className="px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-mono">{t}</span>
+                        ))}
                       </div>
                     )}
                     {detail.planner.stop_condition && (
-                      <div>
-                        <span className="font-semibold text-slate-600 dark:text-slate-300">Stop condition: </span>
-                        <span className="text-slate-500 dark:text-slate-400">{detail.planner.stop_condition}</span>
-                      </div>
+                      <p className="text-slate-400 dark:text-slate-500 text-[11px] italic">Stop: {detail.planner.stop_condition as string}</p>
                     )}
                   </div>
-                </div>
+                </TraceStep>
               )}
 
-              {/* Attempts */}
-              {detail.attempts && detail.attempts.length > 0 && (
-                <div>
-                  <h4 className="text-[11px] font-bold uppercase tracking-wider text-emerald-500 mb-2">
-                    Execution Steps ({detail.attempts.length})
-                  </h4>
-                  <div className="space-y-3">
-                    {detail.attempts.map((attempt, i) => (
-                      <div
-                        key={i}
-                        className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-3"
-                      >
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className={`size-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                            attempt.status === "success"
-                              ? "bg-emerald-500/15 text-emerald-500"
-                              : attempt.status === "rejected"
-                              ? "bg-amber-500/15 text-amber-500"
-                              : "bg-red-500/15 text-red-500"
-                          }`}>
-                            {attempt.attempt || i + 1}
-                          </span>
-                          <span className="text-[12px] font-semibold text-slate-700 dark:text-slate-200">{attempt.title}</span>
-                          <span className="ml-auto px-1.5 py-0.5 rounded text-[9px] font-mono bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
-                            {attempt.kind} / {attempt.answer_mode}
-                          </span>
+              {/* Steps 3+: Attempts */}
+              {detail.attempts.map((attempt, i) => {
+                const isSuccess = attempt.status === "success";
+                const isRejected = attempt.status === "rejected";
+                const durationLabel = attempt.duration_ms ? `${attempt.duration_ms}ms` : undefined;
+                const rowsLabel = attempt.rows_returned !== undefined ? `${attempt.rows_returned} rows` : undefined;
+                const badge = [attempt.kind, durationLabel, rowsLabel].filter(Boolean).join(" · ");
+                const criticIcon = isSuccess ? "check_circle" : isRejected ? "warning" : "error";
+                const criticColor = isSuccess
+                  ? "text-emerald-500"
+                  : isRejected
+                  ? "text-amber-500"
+                  : "text-red-500";
+                return (
+                  <TraceStep
+                    key={i}
+                    icon={criticIcon}
+                    label={attempt.title || `Step ${attempt.attempt || i + 1}`}
+                    badge={badge}
+                    badgeColor={isSuccess ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-mono text-[9px]" : isRejected ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 font-mono text-[9px]" : "bg-red-500/10 text-red-600 font-mono text-[9px]"}
+                  >
+                    <div className="space-y-2">
+                      {attempt.sql && (
+                        <pre className="p-2 rounded bg-slate-900 dark:bg-slate-950 text-emerald-400 text-[10px] font-mono overflow-x-auto whitespace-pre-wrap leading-relaxed">
+                          {attempt.sql}
+                        </pre>
+                      )}
+                      {attempt.python_code && !attempt.sql && (
+                        <pre className="p-2 rounded bg-slate-900 dark:bg-slate-950 text-sky-400 text-[10px] font-mono overflow-x-auto whitespace-pre-wrap leading-relaxed">
+                          {attempt.python_code}
+                        </pre>
+                      )}
+                      {attempt.error && (
+                        <p className="text-[11px] text-red-500 bg-red-500/10 rounded p-2">{attempt.error}</p>
+                      )}
+                      {isRejected && attempt.rejection_reason && (
+                        <div className="rounded bg-amber-500/10 border border-amber-500/20 p-2">
+                          <p className={`text-[11px] font-semibold ${criticColor} mb-1`}>Critic rejected</p>
+                          <p className="text-[11px] text-slate-600 dark:text-slate-400">{String(attempt.rejection_reason)}</p>
+                          {attempt.suggested_fix && (
+                            <p className="mt-1 text-[11px] text-amber-500/80">Fix: {String(attempt.suggested_fix)}</p>
+                          )}
                         </div>
-                        {attempt.sql && (
-                          <pre className="mt-2 p-2 rounded bg-slate-900 dark:bg-slate-950 text-emerald-400 text-[11px] font-mono overflow-x-auto whitespace-pre-wrap leading-relaxed">
-                            {attempt.sql}
-                          </pre>
-                        )}
-                        {attempt.error && (
-                          <p className="mt-2 text-[11px] text-red-500">{attempt.error}</p>
-                        )}
-                        {attempt.rejection_reason ? (
-                          <div className="mt-2 rounded bg-amber-500/10 border border-amber-500/20 p-2">
-                            <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">Critic: {String(attempt.rejection_reason)}</p>
-                            {attempt.suggested_fix ? (
-                              <p className="mt-1 text-[11px] text-amber-500/80 dark:text-amber-400/70">Fix: {String(attempt.suggested_fix)}</p>
-                            ) : null}
-                          </div>
-                        ) : null}
-                        {attempt.critic_ok && !attempt.rejection_reason && attempt.critic_reason ? (
-                          <div className="mt-2 rounded bg-emerald-500/10 border border-emerald-500/20 p-2">
-                            <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">Critic: {String(attempt.critic_reason)}</p>
-                          </div>
-                        ) : null}
-                        {attempt.summary && (
-                          <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">{attempt.summary}</p>
-                        )}
-                        {attempt.sources && attempt.sources.length > 0 && (
-                          <div className="mt-2 flex gap-1 flex-wrap">
-                            {attempt.sources.map((src) => (
-                              <span key={src} className="px-1.5 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 text-[9px] text-slate-500 dark:text-slate-400">
-                                {src}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                      )}
+                      {isSuccess && attempt.critic_reason && (
+                        <p className="text-[11px] text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 rounded p-2">{String(attempt.critic_reason)}</p>
+                      )}
+                      {attempt.summary && (
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">{attempt.summary}</p>
+                      )}
+                    </div>
+                  </TraceStep>
+                );
+              })}
+
+              {/* Final: Response */}
+              <TraceStep icon="chat" label="Response" badge={`${detail.artifacts.length} artifact${detail.artifacts.length !== 1 ? "s" : ""}`} defaultOpen>
+                <div className="rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 p-3 text-[12px] text-slate-600 dark:text-slate-300">
+                  {detail.response}
                 </div>
-              )}
+              </TraceStep>
 
               {detail.attempts.length === 0 && (!detail.planner || Object.keys(detail.planner).length === 0) && (
                 <p className="text-center text-slate-400 text-sm py-8">No execution details available for this query.</p>
               )}
-            </>
+            </div>
           )}
         </div>
       </div>
@@ -787,7 +990,13 @@ function ArtifactRenderer({ artifact }: { artifact: Artifact }) {
 
   const chartElement =
     artifact.chart_type === "line" ? <LineChart artifact={artifact} /> :
+    artifact.chart_type === "dual_axis_line" ? <LineChart artifact={artifact} /> :
     artifact.chart_type === "funnel" ? <FunnelChart artifact={artifact} /> :
+    artifact.chart_type === "pie" ? <PieChart artifact={artifact} /> :
+    artifact.chart_type === "scatter" ? <ScatterChart artifact={artifact} /> :
+    artifact.chart_type === "heatmap" ? <HeatmapChart artifact={artifact} /> :
+    artifact.chart_type === "histogram" ? <HistogramChart artifact={artifact} /> :
+    artifact.chart_type === "box" ? <BoxPlotChart artifact={artifact} /> :
     <BarChart artifact={artifact} />;
 
   return (
@@ -889,33 +1098,40 @@ function SavedEvidenceCard({
         </div>
         <span className="text-[10px] text-slate-500 ml-auto">{formatTime(item.saved_at)}</span>
       </div>
-      {editing ? (
-        <div className="mb-3 flex gap-2">
-          <input
-            className="flex-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-[11px] outline-none focus:ring-2 focus:ring-emerald-500"
-            value={annotation}
-            onChange={(event) => setAnnotation(event.target.value)}
-            placeholder="Add a note about why this matters"
-          />
-          <button
-            onClick={() => {
-              onUpdate(annotation);
-              setEditing(false);
-            }}
-            className="px-3 py-2 rounded-lg bg-emerald-500 text-white text-[11px] font-semibold"
-          >
-            Save
-          </button>
-        </div>
-      ) : item.annotation ? (
-        <p className="mb-3 text-[12px] leading-relaxed text-emerald-600 dark:text-emerald-400">{item.annotation}</p>
-      ) : null}
       <ArtifactRenderer artifact={item.artifact} />
       <div className="mt-3 flex flex-wrap gap-2">
         <span className="px-2 py-1 rounded-full bg-slate-200 dark:bg-slate-800 text-[10px] text-slate-600 dark:text-slate-300">
           {item.citation.source}
         </span>
       </div>
+      {editing ? (
+        <div className="mt-3">
+          <p className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 mb-1.5">Why this matters</p>
+          <div className="flex gap-2">
+            <input
+              className="flex-1 rounded-lg border border-emerald-400/50 dark:border-emerald-600/50 bg-white dark:bg-slate-900 px-3 py-2 text-[11px] outline-none focus:ring-2 focus:ring-emerald-500"
+              value={annotation}
+              onChange={(event) => setAnnotation(event.target.value)}
+              placeholder="Explain why this evidence supports your case..."
+              autoFocus
+            />
+            <button
+              onClick={() => {
+                onUpdate(annotation);
+                setEditing(false);
+              }}
+              className="px-3 py-2 rounded-lg bg-emerald-500 text-white text-[11px] font-semibold"
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      ) : item.annotation ? (
+        <div className="mt-3 rounded-lg bg-emerald-500/8 dark:bg-emerald-500/10 border-l-2 border-emerald-500 px-3 py-2">
+          <p className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 mb-0.5">Why this matters</p>
+          <p className="text-[11px] leading-relaxed text-slate-700 dark:text-slate-200">{item.annotation}</p>
+        </div>
+      ) : null}
       <div className="mt-3 flex gap-2">
         <button
           onClick={() => {
@@ -926,7 +1142,7 @@ function SavedEvidenceCard({
           }}
           className="text-[10px] px-2.5 py-1 rounded-full border border-slate-300 dark:border-slate-700 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
         >
-          {editing ? "Cancel" : item.annotation ? "Edit note" : "Add note"}
+          {editing ? "Cancel" : item.annotation ? "Edit note" : "Why this matters"}
         </button>
         <button
           onClick={onRemove}
@@ -960,11 +1176,23 @@ export default function WorkspacePage() {
   const [saveDrafts, setSaveDrafts] = useState<Record<string, string>>({});
   const [logModalQueryId, setLogModalQueryId] = useState<number | null>(null);
   const [theme, setTheme] = useState<"light" | "dark" | "system">("system");
+  const [evidenceAgentFilter, setEvidenceAgentFilter] = useState<string>("all");
+  const [evidenceTypeFilter, setEvidenceTypeFilter] = useState<string>("all");
+  const [evidenceOrder, setEvidenceOrder] = useState<number[]>([]);
+  const [dragOverId, setDragOverId] = useState<number | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const evidenceEndRef = useRef<HTMLDivElement>(null);
 
   const refreshSavedEvidence = useCallback(() => {
-    getSavedEvidence(sessionId).then((data) => setSavedEvidence(data.evidence)).catch(console.error);
+    getSavedEvidence(sessionId).then((data) => {
+      setSavedEvidence(data.evidence);
+      setEvidenceOrder((prev) => {
+        const newIds = data.evidence.map((e: SavedEvidence) => e.id);
+        const retained = prev.filter((id) => newIds.includes(id));
+        const added = newIds.filter((id: number) => !retained.includes(id));
+        return [...retained, ...added];
+      });
+    }).catch(console.error);
   }, [sessionId]);
 
   useEffect(() => {
@@ -1451,42 +1679,140 @@ export default function WorkspacePage() {
         </section>
 
         <aside className="flex-1 flex flex-col border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-y-auto">
+          {/* Evidence Board header */}
           <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-200 dark:border-slate-800">
             <span className={`material-symbols-outlined text-lg ${ACCENT_TEXT}`}>folder_data</span>
             <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Evidence Board</h3>
             {savedEvidence.length > 0 && (
-              <span className="ml-auto text-[9px] bg-emerald-500/15 text-emerald-400 px-2 py-0.5 rounded-full font-bold">{savedEvidence.length} saved</span>
+              <span
+                key={savedEvidence.length}
+                className="ml-auto text-[9px] bg-emerald-500/15 text-emerald-400 px-2 py-0.5 rounded-full font-bold animate-[pulse_0.6s_ease-out_1]"
+              >
+                {savedEvidence.length} saved
+              </span>
             )}
           </div>
+
+          {/* Agent filter tabs */}
+          {savedEvidence.length > 0 && (() => {
+            const agentCounts: Record<string, number> = {};
+            savedEvidence.forEach((e) => { agentCounts[e.agent] = (agentCounts[e.agent] || 0) + 1; });
+            const presentAgents = AGENTS.filter((a) => agentCounts[a.id]);
+            if (presentAgents.length < 2) return null;
+            return (
+              <div className="flex gap-1 px-3 pt-2.5 pb-1 flex-wrap">
+                <button
+                  onClick={() => setEvidenceAgentFilter("all")}
+                  className={`text-[10px] px-2.5 py-1 rounded-full border transition-colors ${evidenceAgentFilter === "all" ? "bg-slate-700 dark:bg-slate-200 text-white dark:text-slate-900 border-transparent" : "border-slate-300 dark:border-slate-700 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"}`}
+                >
+                  All ({savedEvidence.length})
+                </button>
+                {presentAgents.map((a) => (
+                  <button
+                    key={a.id}
+                    onClick={() => setEvidenceAgentFilter(evidenceAgentFilter === a.id ? "all" : a.id)}
+                    className={`text-[10px] px-2.5 py-1 rounded-full border transition-colors ${evidenceAgentFilter === a.id ? "bg-slate-700 dark:bg-slate-200 text-white dark:text-slate-900 border-transparent" : "border-slate-300 dark:border-slate-700 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"}`}
+                  >
+                    {a.label} ({agentCounts[a.id]})
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
+
+          {/* Type filter */}
+          {savedEvidence.length > 0 && (() => {
+            const types = new Set(savedEvidence.map((e) => e.artifact.type));
+            if (types.size < 2) return null;
+            const typeLabels: Record<string, string> = { chart: "Charts", table: "Tables", metric: "Metrics" };
+            return (
+              <div className="flex gap-1 px-3 pb-2 flex-wrap">
+                <button
+                  onClick={() => setEvidenceTypeFilter("all")}
+                  className={`text-[9px] px-2 py-0.5 rounded-full border transition-colors ${evidenceTypeFilter === "all" ? "bg-slate-600/80 dark:bg-slate-300/80 text-white dark:text-slate-900 border-transparent" : "border-slate-200 dark:border-slate-700/60 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"}`}
+                >
+                  All types
+                </button>
+                {Array.from(types).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setEvidenceTypeFilter(evidenceTypeFilter === t ? "all" : t)}
+                    className={`text-[9px] px-2 py-0.5 rounded-full border transition-colors ${evidenceTypeFilter === t ? "bg-slate-600/80 dark:bg-slate-300/80 text-white dark:text-slate-900 border-transparent" : "border-slate-200 dark:border-slate-700/60 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"}`}
+                  >
+                    {typeLabels[t] || t}
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
 
           <div className="flex-1 overflow-y-auto px-4 py-3">
             {savedEvidence.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center px-6">
                 <span className="material-symbols-outlined text-4xl text-slate-700 mb-3">folder_data</span>
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  Save findings from the chat to build your case. This board reflects your judgment, not the system’s defaults.
+                  Save findings from the chat to build your case. This board reflects your judgment, not the system&apos;s defaults.
                 </p>
               </div>
-            ) : (
-              <div className="flex flex-col gap-3">
-                {savedEvidence.map((item) => (
-                  <SavedEvidenceCard
-                    key={item.id}
-                    item={item}
-                    onRemove={async () => {
-                      await removeEvidence(sessionId, item.id);
-                      refreshSavedEvidence();
-                      getSessionStatus(sessionId).then(setStatus).catch(console.error);
-                    }}
-                    onUpdate={async (annotation) => {
-                      await updateEvidenceAnnotation(sessionId, item.id, annotation);
-                      refreshSavedEvidence();
-                    }}
-                  />
-                ))}
-                <div ref={evidenceEndRef} />
-              </div>
-            )}
+            ) : (() => {
+              const orderedEvidence = evidenceOrder
+                .map((id) => savedEvidence.find((e) => e.id === id))
+                .filter((e): e is SavedEvidence => !!e)
+                .filter((e) => evidenceAgentFilter === "all" || e.agent === evidenceAgentFilter)
+                .filter((e) => evidenceTypeFilter === "all" || e.artifact.type === evidenceTypeFilter);
+
+              if (orderedEvidence.length === 0) {
+                return (
+                  <div className="flex flex-col items-center justify-center py-8 text-center px-4">
+                    <p className="text-xs text-slate-500">No evidence matches the current filter.</p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="flex flex-col gap-3">
+                  {orderedEvidence.map((item) => (
+                    <div
+                      key={item.id}
+                      draggable
+                      onDragStart={(ev) => ev.dataTransfer.setData("evidenceId", String(item.id))}
+                      onDragOver={(ev) => { ev.preventDefault(); setDragOverId(item.id); }}
+                      onDragLeave={() => setDragOverId(null)}
+                      onDrop={(ev) => {
+                        ev.preventDefault();
+                        setDragOverId(null);
+                        const draggedId = parseInt(ev.dataTransfer.getData("evidenceId"), 10);
+                        if (draggedId === item.id) return;
+                        setEvidenceOrder((prev) => {
+                          const next = [...prev];
+                          const fromIdx = next.indexOf(draggedId);
+                          const toIdx = next.indexOf(item.id);
+                          if (fromIdx < 0 || toIdx < 0) return prev;
+                          next.splice(fromIdx, 1);
+                          next.splice(toIdx, 0, draggedId);
+                          return next;
+                        });
+                      }}
+                      className={`transition-all ${dragOverId === item.id ? "ring-2 ring-emerald-500/50 rounded-xl" : ""}`}
+                    >
+                      <SavedEvidenceCard
+                        item={item}
+                        onRemove={async () => {
+                          await removeEvidence(sessionId, item.id);
+                          refreshSavedEvidence();
+                          getSessionStatus(sessionId).then(setStatus).catch(console.error);
+                        }}
+                        onUpdate={async (annotation) => {
+                          await updateEvidenceAnnotation(sessionId, item.id, annotation);
+                          refreshSavedEvidence();
+                        }}
+                      />
+                    </div>
+                  ))}
+                  <div ref={evidenceEndRef} />
+                </div>
+              );
+            })()}
           </div>
 
           <div className="border-t border-slate-200 dark:border-slate-800 px-4 py-4 shrink-0">

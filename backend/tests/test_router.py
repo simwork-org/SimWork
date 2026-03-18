@@ -630,6 +630,106 @@ def test_chart_queries_can_return_more_than_twelve_rows():
     assert len(chart["labels"]) > 12
 
 
+def test_explicit_line_chart_type_is_preserved_for_non_time_labels():
+    llm = StubLLM(
+        json_responses=[
+            {
+                "question_understanding": "Compare payment outcomes by status.",
+                "complexity": "single_query",
+                "target_tables": ["payments"],
+                "stop_condition": "Once the payment status comparison is available.",
+                "next_steps": [],
+            },
+            {
+                "action": "sql",
+                "sql": (
+                    "SELECT status, COUNT(*) AS payment_count "
+                    "FROM [payments] "
+                    "GROUP BY status "
+                    "ORDER BY payment_count DESC"
+                ),
+                "title": "Payment status comparison",
+                "answer_mode": "chart",
+                "chart_type": "line",
+            },
+        ],
+        text_response="The payment status comparison is shown in the attached chart.",
+    )
+
+    result = route_query(llm, "checkout_conversion_drop", "analyst", "Compare payment outcomes by status")
+
+    chart = result["artifacts"][0]
+    assert chart["kind"] == "chart"
+    assert chart["chart_type"] == "line"
+
+
+def test_explicit_funnel_chart_type_is_supported_for_stage_data():
+    llm = StubLLM(
+        json_responses=[
+            {
+                "question_understanding": "Show the checkout funnel.",
+                "complexity": "single_query",
+                "target_tables": ["orders"],
+                "stop_condition": "Once the funnel stages are available.",
+                "next_steps": [],
+            },
+            {
+                "action": "sql",
+                "sql": (
+                    "SELECT step_name, users FROM ("
+                    "SELECT 'Orders created' AS step_name, COUNT(*) AS users, 1 AS step_order FROM [orders] "
+                    "UNION ALL "
+                    "SELECT 'Orders completed' AS step_name, COUNT(*) AS users, 2 AS step_order FROM [orders] WHERE order_status = 'completed'"
+                    ") ORDER BY step_order"
+                ),
+                "title": "Checkout funnel",
+                "answer_mode": "chart",
+                "chart_type": "funnel",
+            },
+        ],
+        text_response="The checkout funnel is shown in the attached chart.",
+    )
+
+    result = route_query(llm, "checkout_conversion_drop", "analyst", "Show the checkout funnel")
+
+    chart = result["artifacts"][0]
+    assert chart["kind"] == "chart"
+    assert chart["chart_type"] == "funnel"
+
+
+def test_invalid_chart_type_falls_back_to_inferred_bar_chart():
+    llm = StubLLM(
+        json_responses=[
+            {
+                "question_understanding": "Compare payment outcomes by status.",
+                "complexity": "single_query",
+                "target_tables": ["payments"],
+                "stop_condition": "Once payment status comparison is available.",
+                "next_steps": [],
+            },
+            {
+                "action": "sql",
+                "sql": (
+                    "SELECT status, COUNT(*) AS payment_count "
+                    "FROM [payments] "
+                    "GROUP BY status "
+                    "ORDER BY payment_count DESC"
+                ),
+                "title": "Payment status comparison",
+                "answer_mode": "chart",
+                "chart_type": "scatter",
+            },
+        ],
+        text_response="Payment status comparison is shown in the attached chart.",
+    )
+
+    result = route_query(llm, "checkout_conversion_drop", "analyst", "Compare payment outcomes by status")
+
+    chart = result["artifacts"][0]
+    assert chart["kind"] == "chart"
+    assert chart["chart_type"] == "bar"
+
+
 def test_scoped_sql_executor_rejects_unauthorized_tables():
     result = execute_authorized_select(
         scenario_id="checkout_conversion_drop",

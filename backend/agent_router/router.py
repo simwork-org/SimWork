@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 import uuid
 from typing import Any, Callable
 
@@ -56,6 +57,18 @@ ACTION_SCHEMA = {
     "document_terms": ["Optional search terms for document excerpts"],
     "title": "Human-friendly title for the resulting evidence",
     "answer_mode": "metric | chart | table | text",
+    "chart_type": (
+        "Optional when answer_mode=chart. Choose the most appropriate type: "
+        "bar (categorical comparisons, rankings, top-N), "
+        "line (trends over time, continuous data), "
+        "funnel (sequential steps with drop-off), "
+        "pie (proportions/share of total, max 8 slices), "
+        "scatter (correlation between two numeric variables), "
+        "heatmap (matrix of values, cross-tabs, cohort grids), "
+        "histogram (distribution of a single numeric variable), "
+        "box (statistical spread: min/Q1/median/Q3/max), "
+        "dual_axis_line (two metrics with very different scales on same time axis)"
+    ),
 }
 
 
@@ -93,6 +106,7 @@ def route_query(
     effective_query = clarification_resolution["effective_query"] or query
     clarification_history = clarification_resolution["clarification_history"]
 
+    _route_start_ms = time.monotonic()
     _emit("planning", "Understanding your question and planning investigation...")
     plan, plan_warning = _plan_investigation(
         llm=llm,
@@ -171,6 +185,18 @@ def route_query(
         conversation_context=conversation_context,
     )
 
+    total_duration_ms = round((time.monotonic() - _route_start_ms) * 1000)
+    trace = {
+        "intent": query,
+        "effective_query": effective_query if effective_query != query else None,
+        "conversation_turns": len(history),
+        "clarification_asked": clarification_resolution.get("latest_reply"),
+        "clarification_resolved": bool(clarification_resolution.get("effective_query")),
+        "plan_complexity": plan.get("complexity", "single_query"),
+        "total_attempts": len(attempts),
+        "evidence_collected": len(evidence),
+        "total_duration_ms": total_duration_ms,
+    }
     return {
         "agent": agent,
         "response": response,
@@ -182,6 +208,7 @@ def route_query(
         "intent_class": "investigation",
         "_planner": {**plan, "conversation_context_summary": conversation_context, "attempt_count": len(attempts)},
         "_attempts": attempts,
+        "_trace": trace,
     }
 
 
@@ -277,6 +304,7 @@ def _run_investigation_loop(
         if action_type == "finish":
             break
 
+        _step_start_ms = time.monotonic()
         if action_type == "document":
             _emit("searching_docs", f"Searching documents: {action.get('title', '')}")
             record = _execute_document_step(
@@ -301,6 +329,8 @@ def _run_investigation_loop(
             )
 
         record["attempt"] = attempt_no
+        record["duration_ms"] = round((time.monotonic() - _step_start_ms) * 1000)
+        record["rows_returned"] = len(record.get("rows") or [])
         attempts.append(record)
 
         if record["status"] == "success" and record.get("rows"):
@@ -329,6 +359,7 @@ def _run_investigation_loop(
                     "rows": record.get("rows", []),
                     "columns": record.get("columns", []),
                     "answer_mode": record.get("answer_mode", "table"),
+                    "chart_type": record.get("chart_type"),
                     "summary": _summarize_attempt(record),
                     "sources": record.get("sources", []),
                     "query": record.get("sql"),
@@ -371,6 +402,17 @@ def _choose_next_action(
         "Choose the next best step to answer the question. "
         "If the user mentioned a segment or category that might match a low-cardinality column, check metadata or run a small discovery query before asking for clarification. "
         "For trend or time-series questions, use answer_mode=chart and query the full available date range unless the user explicitly asks for a narrower window. "
+        "Choose answer_mode and chart_type based on query intent: "
+        "use answer_mode=metric for single-value questions (total, first, max, which X); "
+        "use chart_type=line for trends over time; "
+        "use chart_type=bar for categorical comparisons and rankings; "
+        "use chart_type=funnel for sequential stage drop-off; "
+        "use chart_type=pie for proportions/share of total (only when ≤8 categories); "
+        "use chart_type=scatter when the user asks about correlation between two numeric variables; "
+        "use chart_type=heatmap for matrix/cross-tab/cohort data; "
+        "use chart_type=histogram when showing distribution of a single numeric variable; "
+        "use chart_type=box for statistical spread (min/max/quartiles); "
+        "use chart_type=dual_axis_line when comparing two metrics with very different scales on the same time axis. "
         "Do not add arbitrary recent-day limits to trend queries. "
         "For weekly aggregations in SQLite, always use strftime('%Y-%m-%d', date_col, 'weekday 0', '-6 days') "
         "to get the Monday (week start) date, and GROUP BY that expression. "
@@ -422,6 +464,7 @@ def _execute_sql_step(
             "kind": "sql",
             "title": action.get("title") or "SQL attempt",
             "answer_mode": action.get("answer_mode", "table"),
+            "chart_type": action.get("chart_type"),
             "sql": sql,
             "error": result["error"],
             "sources": result.get("referenced_tables", []),
@@ -434,6 +477,7 @@ def _execute_sql_step(
         "kind": "sql",
         "title": action.get("title") or "SQL result",
         "answer_mode": action.get("answer_mode", "table"),
+        "chart_type": action.get("chart_type"),
         "sql": result["executed_sql"],
         "sources": result.get("referenced_tables", []),
         "columns": result["columns"],
@@ -466,6 +510,7 @@ def _execute_python_step(
             "kind": "python",
             "title": action.get("title") or "Python attempt",
             "answer_mode": action.get("answer_mode", "table"),
+            "chart_type": action.get("chart_type"),
             "sql": sql,
             "python_code": python_code,
             "error": f"SQL step failed: {sql_result['error']}",
@@ -488,6 +533,7 @@ def _execute_python_step(
             "kind": "python",
             "title": action.get("title") or "Python attempt",
             "answer_mode": action.get("answer_mode", "table"),
+            "chart_type": action.get("chart_type"),
             "sql": sql,
             "python_code": python_code,
             "error": f"Pandas step failed: {sandbox_result['error']}",
@@ -502,6 +548,7 @@ def _execute_python_step(
         "kind": "python",
         "title": action.get("title") or "Python result",
         "answer_mode": action.get("answer_mode", "table"),
+        "chart_type": action.get("chart_type"),
         "sql": sql,
         "python_code": python_code,
         "sources": sql_result.get("referenced_tables", []),
@@ -822,6 +869,7 @@ def _normalize_action(action: dict[str, Any], plan: dict[str, Any], source_metad
     answer_mode = str(action.get("answer_mode") or "table").strip().lower()
     if answer_mode not in {"metric", "chart", "table", "text"}:
         answer_mode = "table"
+    chart_type = _normalize_chart_type(action.get("chart_type")) if answer_mode == "chart" else None
     document = str(action.get("document") or "").strip()
     if document and document not in allowed_sources:
         document = ""
@@ -834,6 +882,7 @@ def _normalize_action(action: dict[str, Any], plan: dict[str, Any], source_metad
         "document_terms": [str(term).strip() for term in raw_document_terms if str(term).strip()][:3],
         "title": str(action.get("title") or "").strip() or "Investigation result",
         "answer_mode": answer_mode,
+        "chart_type": chart_type,
         "target_tables": plan.get("target_tables", []),
     }
 
@@ -871,6 +920,7 @@ def _artifact_from_evidence(item: dict[str, Any], citation_id: str, agent: str) 
     rows = item.get("rows", [])
     columns = item.get("columns", [])
     answer_mode = item.get("answer_mode", "table")
+    explicit_chart_type = _normalize_chart_type(item.get("chart_type"))
     numeric_columns = [col for col in columns if _column_is_numeric(rows, col)]
     if rows and answer_mode == "metric" and len(rows) == 1 and numeric_columns:
         value_col = numeric_columns[0]
@@ -926,7 +976,12 @@ def _artifact_from_evidence(item: dict[str, Any], citation_id: str, agent: str) 
                     lbl = str(row.get(label_column, ""))
                     cat = str(row.get(category_column, ""))
                     pivoted[lbl][cat] = float(row.get(val_col, 0) or 0)
-                chart_type = "line" if _looks_like_time_column(rows, label_column) else "bar"
+                chart_type = _resolve_chart_type(
+                    explicit_chart_type=explicit_chart_type,
+                    rows=rows,
+                    label_column=label_column,
+                    value_columns=[val_col],
+                )
                 label_order = _normalize_week_labels(label_order)
                 series = [
                     {"name": cat, "values": [pivoted[lbl][cat] for lbl in pivoted]}
@@ -934,13 +989,19 @@ def _artifact_from_evidence(item: dict[str, Any], citation_id: str, agent: str) 
                 ]
                 from agent_router.downsample import downsample_chart
                 label_order, series, _ds = downsample_chart(label_order, series)
+                resolved_chart_type = chart_type
+                dual_axis = False
+                if resolved_chart_type == "dual_axis_line" or (resolved_chart_type == "line" and _detect_dual_axis(series)):
+                    resolved_chart_type = "dual_axis_line"
+                    dual_axis = True
                 return {
                     "kind": "chart",
                     "title": item["title"],
-                    "chart_type": chart_type,
+                    "chart_type": resolved_chart_type,
                     "labels": label_order,
                     "series": series,
                     "multi_measure": False,
+                    "dual_axis": dual_axis,
                     "citation_ids": [citation_id],
                     "purpose": "supporting_evidence",
                     "display_mode": "board_default",
@@ -950,7 +1011,12 @@ def _artifact_from_evidence(item: dict[str, Any], citation_id: str, agent: str) 
                     "summary": item["summary"],
                 }
 
-        chart_type = "line" if _looks_like_time_column(rows, label_column) else "bar"
+        chart_type = _resolve_chart_type(
+            explicit_chart_type=explicit_chart_type,
+            rows=rows,
+            label_column=label_column,
+            value_columns=value_columns,
+        )
         labels_list = _normalize_week_labels([str(row.get(label_column, "")) for row in rows])
         series = [
             {"name": col, "values": [float(row.get(col, 0) or 0) for row in rows]}
@@ -958,6 +1024,10 @@ def _artifact_from_evidence(item: dict[str, Any], citation_id: str, agent: str) 
         ]
         from agent_router.downsample import downsample_chart
         labels_list, series, _ds = downsample_chart(labels_list, series)
+        dual_axis = False
+        if chart_type == "dual_axis_line" or (chart_type == "line" and _detect_dual_axis(series)):
+            chart_type = "dual_axis_line"
+            dual_axis = True
         return {
             "kind": "chart",
             "title": item["title"],
@@ -965,6 +1035,7 @@ def _artifact_from_evidence(item: dict[str, Any], citation_id: str, agent: str) 
             "labels": labels_list,
             "series": series,
             "multi_measure": len(value_columns) > 1,
+            "dual_axis": dual_axis,
             "citation_ids": [citation_id],
             "purpose": "supporting_evidence",
             "display_mode": "board_default",
@@ -1099,6 +1170,61 @@ def _normalize_week_labels(labels: list[str]) -> list[str]:
                     pass
         normalized.append(label)
     return normalized
+
+
+_VALID_CHART_TYPES = {"bar", "line", "funnel", "pie", "scatter", "heatmap", "histogram", "box", "dual_axis_line"}
+
+
+def _normalize_chart_type(value: Any) -> str | None:
+    chart_type = str(value or "").strip().lower()
+    if chart_type in _VALID_CHART_TYPES:
+        return chart_type
+    return None
+
+
+def _resolve_chart_type(
+    explicit_chart_type: str | None,
+    rows: list[dict[str, Any]],
+    label_column: str,
+    value_columns: list[str],
+) -> str:
+    inferred = "line" if _looks_like_time_column(rows, label_column) else "bar"
+    if explicit_chart_type == "funnel":
+        if len(value_columns) == 1 and len(rows) >= 2:
+            return "funnel"
+        return inferred
+    if explicit_chart_type == "pie":
+        if len(value_columns) == 1 and 2 <= len(rows) <= 8:
+            return "pie"
+        return inferred
+    if explicit_chart_type == "scatter":
+        if len(value_columns) >= 2:
+            return "scatter"
+        return inferred
+    if explicit_chart_type in {"heatmap", "histogram", "box"}:
+        return explicit_chart_type
+    if explicit_chart_type == "dual_axis_line":
+        if len(value_columns) >= 2:
+            return "dual_axis_line"
+        return "line"
+    if explicit_chart_type in {"bar", "line"}:
+        return explicit_chart_type
+    return inferred
+
+
+def _detect_dual_axis(series: list[dict[str, Any]]) -> bool:
+    """Return True when two series have values differing by more than 10x in magnitude."""
+    if len(series) != 2:
+        return False
+    def _max_abs(values: list) -> float:
+        nums = [abs(v) for v in values if isinstance(v, (int, float)) and v is not None]
+        return max(nums) if nums else 0.0
+    mag_a = _max_abs(series[0].get("values", []))
+    mag_b = _max_abs(series[1].get("values", []))
+    if mag_a == 0 or mag_b == 0:
+        return False
+    ratio = max(mag_a, mag_b) / min(mag_a, mag_b)
+    return ratio >= 10
 
 
 def _looks_like_time_column(rows: list[dict[str, Any]], column: str) -> bool:

@@ -35,6 +35,7 @@ def _ensure_query_log_columns(conn: sqlite3.Connection) -> None:
         "warnings_json": "TEXT",
         "planner_json": "TEXT",
         "attempts_json": "TEXT",
+        "trace_json": "TEXT",
     }
     existing = _table_columns(conn, "query_logs")
     for column, data_type in wanted.items():
@@ -245,6 +246,7 @@ def log_query(
     warnings: list[str] | None = None,
     planner: dict[str, Any] | None = None,
     attempts: list[dict[str, Any]] | None = None,
+    trace: dict[str, Any] | None = None,
 ) -> int:
     conn = _get_conn()
     _ensure_query_log_columns(conn)
@@ -260,8 +262,9 @@ def log_query(
             warnings_json,
             planner_json,
             attempts_json,
+            trace_json,
             timestamp
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             session_id,
@@ -273,6 +276,7 @@ def log_query(
             json.dumps(warnings or []),
             json.dumps(planner or {}),
             json.dumps(attempts or []),
+            json.dumps(trace or {}),
             _utcnow(),
         ),
     )
@@ -364,7 +368,7 @@ def get_query_log_detail(session_id: str, query_log_id: int) -> dict[str, Any] |
     row = conn.execute(
         """
         SELECT id, agent, query_text, response_text, artifacts_json, citations_json,
-               warnings_json, planner_json, attempts_json, timestamp
+               warnings_json, planner_json, attempts_json, trace_json, timestamp
         FROM query_logs
         WHERE session_id = ? AND id = ?
         """,
@@ -383,6 +387,7 @@ def get_query_log_detail(session_id: str, query_log_id: int) -> dict[str, Any] |
         "warnings": json.loads(row["warnings_json"] or "[]"),
         "planner": json.loads(row["planner_json"] or "{}"),
         "attempts": json.loads(row["attempts_json"] or "[]"),
+        "trace": json.loads(row["trace_json"] or "{}"),
         "timestamp": row["timestamp"],
     }
 

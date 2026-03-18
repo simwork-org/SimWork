@@ -7,6 +7,7 @@ import {
   getSavedEvidence,
   getScoringResult,
   triggerScoring,
+  type Artifact,
   type DimensionScore,
   type SavedEvidence,
   type ScoringResult,
@@ -100,6 +101,94 @@ function BulletList({ title, items, icon, color }: { title: string; items: strin
       </ul>
     </div>
   );
+}
+
+function ReviewArtifactView({ artifact }: { artifact: Artifact }) {
+  if (artifact.kind === "metric") {
+    return (
+      <div className="mt-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 p-3 text-center">
+        <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{artifact.value}</p>
+        {artifact.label && <p className="text-[11px] text-slate-500 mt-0.5">{artifact.label}</p>}
+        {artifact.change !== undefined && artifact.change !== null && (
+          <p className={`text-[11px] mt-0.5 font-semibold ${artifact.change >= 0 ? "text-emerald-500" : "text-red-500"}`}>
+            {artifact.change >= 0 ? "+" : ""}{artifact.change}%
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  if (artifact.kind === "table") {
+    const previewRows = artifact.rows.slice(0, 5);
+    return (
+      <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700/50">
+        <table className="w-full text-[11px]">
+          <thead>
+            <tr className="bg-slate-50 dark:bg-slate-800/60">
+              {artifact.columns.map((col) => (
+                <th key={col} className="px-3 py-1.5 text-left font-semibold text-slate-500 whitespace-nowrap">{col}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {previewRows.map((row, i) => (
+              <tr key={i} className={i % 2 === 0 ? "bg-white dark:bg-slate-900/20" : "bg-slate-50/50 dark:bg-slate-800/20"}>
+                {artifact.columns.map((col) => (
+                  <td key={col} className="px-3 py-1.5 text-slate-700 dark:text-slate-300 whitespace-nowrap">{row[col] ?? "—"}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {artifact.rows.length > 5 && (
+          <p className="text-[10px] text-slate-400 px-3 py-1 bg-slate-50 dark:bg-slate-800/40">+{artifact.rows.length - 5} more rows</p>
+        )}
+      </div>
+    );
+  }
+
+  // Chart — render a simple bar/line preview
+  if (artifact.kind === "chart") {
+    const series = artifact.series[0];
+    if (!series || series.values.length === 0) return null;
+    const max = Math.max(...series.values.map(Math.abs), 1);
+    const isLine = artifact.chart_type === "line" || artifact.chart_type === "dual_axis_line";
+    if (isLine) {
+      const pts = series.values.map((v, i) => ({
+        x: (i / Math.max(series.values.length - 1, 1)) * 280,
+        y: 60 - (v / max) * 55,
+      }));
+      return (
+        <div className="mt-3">
+          <svg viewBox="0 0 280 65" className="w-full h-16">
+            <polyline points={pts.map((p) => `${p.x},${p.y}`).join(" ")} fill="none" stroke="#10b981" strokeWidth="2" />
+            {pts.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r="2.5" fill="#10b981" />)}
+          </svg>
+          <div className="flex justify-between text-[9px] text-slate-400 px-1">
+            <span>{artifact.labels[0]}</span>
+            <span>{artifact.labels[artifact.labels.length - 1]}</span>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className="mt-3 flex items-end gap-1 h-16">
+        {series.values.slice(0, 12).map((v, i) => (
+          <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
+            <div
+              className="w-full rounded-sm bg-emerald-500/70"
+              style={{ height: `${Math.max((Math.abs(v) / max) * 52, 2)}px` }}
+            />
+            {artifact.labels[i] && (
+              <span className="text-[8px] text-slate-400 truncate w-full text-center">{artifact.labels[i]}</span>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return null;
 }
 
 export default function ReviewPage() {
@@ -284,10 +373,14 @@ export default function ReviewPage() {
                           <span className="text-[10px] text-slate-400">{item.artifact.kind}</span>
                         </div>
                         <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{item.artifact.title}</p>
+                        <ReviewArtifactView artifact={item.artifact} />
                         {item.annotation && (
-                          <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">{item.annotation}</p>
+                          <div className="mt-3 rounded-lg bg-emerald-500/8 dark:bg-emerald-500/10 border-l-2 border-emerald-500 px-3 py-2">
+                            <p className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 mb-0.5">Why this matters</p>
+                            <p className="text-xs text-slate-700 dark:text-slate-200 leading-relaxed">{item.annotation}</p>
+                          </div>
                         )}
-                        <p className="text-[11px] text-slate-400 mt-1">{item.citation.source}</p>
+                        <p className="text-[11px] text-slate-400 mt-2">{item.citation.source}</p>
                       </div>
                     ))}
                   </div>

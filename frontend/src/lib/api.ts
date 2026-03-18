@@ -64,10 +64,13 @@ export interface MetricArtifact extends ArtifactBase {
 
 export interface ChartArtifact extends ArtifactBase {
   kind: "chart";
-  chart_type?: "bar" | "line" | "funnel";
+  chart_type?: "bar" | "line" | "funnel" | "pie" | "scatter" | "heatmap" | "histogram" | "box" | "dual_axis_line";
   labels: string[];
   series: { name: string; values: number[] }[];
   multi_measure?: boolean;
+  dual_axis?: boolean;
+  primary_unit?: string;
+  secondary_unit?: string;
   unit?: string;
   columns?: string[];
   rows?: Record<string, string | number | null>[];
@@ -237,11 +240,28 @@ export interface QueryLogDetail {
     kind?: string;
     answer_mode?: string;
     sql?: string;
+    python_code?: string;
     error?: string;
     summary?: string;
     sources?: string[];
+    rejection_reason?: string;
+    suggested_fix?: string;
+    critic_ok?: boolean;
+    critic_reason?: string;
+    duration_ms?: number;
+    rows_returned?: number;
     [key: string]: unknown;
   }[];
+  trace?: {
+    intent?: string;
+    effective_query?: string | null;
+    conversation_turns?: number;
+    plan_complexity?: string;
+    total_attempts?: number;
+    evidence_collected?: number;
+    total_duration_ms?: number;
+    [key: string]: unknown;
+  };
   timestamp: string;
 }
 
