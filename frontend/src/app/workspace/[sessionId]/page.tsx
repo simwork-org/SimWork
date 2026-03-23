@@ -1722,7 +1722,7 @@ export default function WorkspacePage() {
 
           {/* Type filter */}
           {savedEvidence.length > 0 && (() => {
-            const types = new Set(savedEvidence.map((e) => e.artifact.type));
+            const types = new Set(savedEvidence.map((e) => e.artifact.kind));
             if (types.size < 2) return null;
             const typeLabels: Record<string, string> = { chart: "Charts", table: "Tables", metric: "Metrics" };
             return (
@@ -1759,7 +1759,7 @@ export default function WorkspacePage() {
                 .map((id) => savedEvidence.find((e) => e.id === id))
                 .filter((e): e is SavedEvidence => !!e)
                 .filter((e) => evidenceAgentFilter === "all" || e.agent === evidenceAgentFilter)
-                .filter((e) => evidenceTypeFilter === "all" || e.artifact.type === evidenceTypeFilter);
+                .filter((e) => evidenceTypeFilter === "all" || e.artifact.kind === evidenceTypeFilter);
 
               if (orderedEvidence.length === 0) {
                 return (

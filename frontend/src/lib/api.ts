@@ -54,6 +54,8 @@ interface ArtifactBase {
 export interface MetricArtifact extends ArtifactBase {
   kind: "metric";
   value?: string | number;
+  label?: string;
+  change?: number;
   unit?: string;
   subtitle?: string;
   labels?: string[];
