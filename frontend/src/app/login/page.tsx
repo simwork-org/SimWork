@@ -2,6 +2,8 @@
 
 import { signIn } from "next-auth/react";
 
+const POST_LOGIN_REDIRECT = "/scenarios";
+
 const FEATURES = [
   {
     icon: "cases",
@@ -88,7 +90,7 @@ export default function LoginPage() {
           <p className="text-sm text-slate-400 mb-6">Sign in to start your simulation</p>
 
           <button
-            onClick={() => signIn("google", { callbackUrl: "/" })}
+            onClick={() => signIn("google", { callbackUrl: POST_LOGIN_REDIRECT })}
             className="flex w-full items-center justify-center gap-3 rounded-lg bg-white px-4 py-3 text-sm font-medium text-slate-900 transition hover:bg-slate-100"
           >
             <svg className="size-5" viewBox="0 0 24 24">
