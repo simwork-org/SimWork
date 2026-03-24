@@ -29,29 +29,24 @@ export default function AuthRedirectPage() {
         clearCookie("simwork_role");
         clearCookie("simwork_invite");
 
-        // Set role if coming from company signup
         if (pendingRole === "company") {
           setStatus("Setting up your account...");
           await setMyRole("company");
         }
 
-        // If there's a pending invite, claim it and go to briefing
         if (pendingInvite) {
           setStatus("Preparing your assessment...");
           try {
             const result = await claimInvite(pendingInvite);
-            // Store company name for the briefing page
             if (result.company_name) {
               document.cookie = `simwork_company=${encodeURIComponent(result.company_name)};path=/;max-age=600`;
             }
             router.replace(`/briefing/${result.session_id}`);
             return;
           } catch {
-            // Invite may be invalid/used — fall through to normal routing
           }
         }
 
-        // Get user profile to determine where to go
         const me = await getMe();
 
         if (me.role === "company") {
@@ -59,17 +54,16 @@ export default function AuthRedirectPage() {
         } else {
           const { sessions } = await getMySessions();
           const assignedSession = sessions.find((item) => item.assessment_id || item.invite_token);
+          if (assignedSession?.company_name) {
+            document.cookie = `simwork_company=${encodeURIComponent(assignedSession.company_name)};path=/;max-age=600`;
+          }
           if (assignedSession) {
-            if (assignedSession.company_name) {
-              document.cookie = `simwork_company=${encodeURIComponent(assignedSession.company_name)};path=/;max-age=600`;
-            }
             router.replace(`/briefing/${assignedSession.session_id}`);
             return;
           }
           router.replace("/");
         }
       } catch {
-        // Fallback
         router.replace("/");
       }
     }

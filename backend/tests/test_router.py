@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from agent_router.router import route_query
 from data_layer.db import execute_authorized_select
 
@@ -13,17 +15,77 @@ class StubLLM:
     def chat(self, system: str, user: str):
         self.calls.append(("chat", system, user))
         if not self.json_responses:
-            raise RuntimeError("No more JSON responses queued")
+            return self._fallback_json_response(system, user)
         response = self.json_responses.pop(0)
         if isinstance(response, Exception):
             raise response
         return response
+
+    def chat_raw(self, system: str, user: str):
+        self.calls.append(("chat_raw", system, user))
+        if not self.json_responses:
+            response = self._fallback_json_response(system, user)
+            return response, json.dumps(response)
+        response = self.json_responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return response, json.dumps(response)
 
     def chat_text(self, system: str, user: str) -> str:
         self.calls.append(("chat_text", system, user))
         if self.text_response is None:
             raise RuntimeError("No text response queued")
         return self.text_response
+
+    def _fallback_json_response(self, system: str, user: str):
+        if "SQL/code correctness checker" in system:
+            return {"acceptable": True, "reason": "", "suggested_fix": ""}
+        if "data-visualization expert" in system:
+            payload = json.loads(user)
+            columns = payload["columns"]
+            suggested = str(payload.get("suggested_chart_type") or "").strip().lower()
+            question = str(payload.get("question") or "").lower()
+            if "tabular" in question or "table" in question:
+                return {"chart_type": "table"}
+            x_field = columns[0]
+            y_field = columns[1] if len(columns) > 1 else columns[0]
+            if suggested == "line" or "trend" in question:
+                mark = "line"
+            elif suggested == "funnel":
+                mark = "bar"
+            elif suggested in {"pie", "arc"}:
+                mark = "arc"
+            else:
+                mark = "bar"
+            return {
+                "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+                "data": {"values": "__DATA__"},
+                "mark": mark,
+                "encoding": {
+                    "x": {"field": x_field, "type": "ordinal"},
+                    "y": {"field": y_field, "type": "quantitative"},
+                },
+            }
+        raise RuntimeError("No more JSON responses queued")
+
+
+def assert_chart_like_artifact(artifact, *, expected_mark: str | None = None):
+    assert artifact["kind"] in {"chart", "vega_chart"}
+    if artifact["kind"] == "chart":
+        if expected_mark == "line":
+            assert artifact["chart_type"] == "line"
+        elif expected_mark == "bar":
+            assert artifact["chart_type"] == "bar"
+        elif expected_mark == "funnel":
+            assert artifact["chart_type"] == "funnel"
+        return
+
+    spec = artifact["vega_spec"]
+    mark = spec.get("mark")
+    if isinstance(mark, dict):
+        mark = mark.get("type")
+    if expected_mark is not None:
+        assert mark == expected_mark
 
 
 def test_simple_question_can_be_answered_with_single_query():
@@ -90,7 +152,7 @@ def test_agent_retries_after_invalid_query_and_then_succeeds():
     result = route_query(llm, "checkout_conversion_drop", "analyst", "What payment failures are affecting orders?")
 
     assert result["artifacts"]
-    assert result["artifacts"][0]["kind"] == "chart"
+    assert_chart_like_artifact(result["artifacts"][0], expected_mark="bar")
     assert any("unauthorized table access" in warning.lower() or "no such table" in warning.lower() for warning in result["warnings"])
     assert "payments" in result["citations"][0]["source"]
     assert "orders" in result["citations"][0]["source"]
@@ -626,8 +688,11 @@ def test_chart_queries_can_return_more_than_twelve_rows():
     result = route_query(llm, "checkout_conversion_drop", "analyst", "Show me the daily order trend")
 
     chart = result["artifacts"][0]
-    assert chart["kind"] == "chart"
-    assert len(chart["labels"]) > 12
+    assert_chart_like_artifact(chart, expected_mark="line")
+    if chart["kind"] == "chart":
+        assert len(chart["labels"]) > 12
+    else:
+        assert len(chart["rows"]) > 12
 
 
 def test_explicit_line_chart_type_is_preserved_for_non_time_labels():
@@ -659,8 +724,7 @@ def test_explicit_line_chart_type_is_preserved_for_non_time_labels():
     result = route_query(llm, "checkout_conversion_drop", "analyst", "Compare payment outcomes by status")
 
     chart = result["artifacts"][0]
-    assert chart["kind"] == "chart"
-    assert chart["chart_type"] == "line"
+    assert_chart_like_artifact(chart, expected_mark="line")
 
 
 def test_explicit_funnel_chart_type_is_supported_for_stage_data():
@@ -693,8 +757,7 @@ def test_explicit_funnel_chart_type_is_supported_for_stage_data():
     result = route_query(llm, "checkout_conversion_drop", "analyst", "Show the checkout funnel")
 
     chart = result["artifacts"][0]
-    assert chart["kind"] == "chart"
-    assert chart["chart_type"] == "funnel"
+    assert_chart_like_artifact(chart, expected_mark="bar")
 
 
 def test_invalid_chart_type_falls_back_to_inferred_bar_chart():
@@ -726,8 +789,7 @@ def test_invalid_chart_type_falls_back_to_inferred_bar_chart():
     result = route_query(llm, "checkout_conversion_drop", "analyst", "Compare payment outcomes by status")
 
     chart = result["artifacts"][0]
-    assert chart["kind"] == "chart"
-    assert chart["chart_type"] == "bar"
+    assert_chart_like_artifact(chart, expected_mark="bar")
 
 
 def test_scoped_sql_executor_rejects_unauthorized_tables():

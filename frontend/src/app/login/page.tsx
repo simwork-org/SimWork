@@ -28,7 +28,6 @@ function LoginContent() {
   const invite = searchParams.get("invite") || "";
 
   const handleSignIn = () => {
-    // Store role/invite in cookies so /auth/redirect can read them
     if (role) document.cookie = `simwork_role=${role};path=/;max-age=600`;
     if (invite) document.cookie = `simwork_invite=${invite};path=/;max-age=600`;
     signIn("google", { callbackUrl: "/auth/redirect" });
@@ -47,7 +46,6 @@ function LoginContent() {
         backgroundSize: "24px 24px, 100% 100%, 100% 100%",
       }}
     >
-      {/* Left — Hero */}
       <div className="hidden lg:flex flex-col justify-center flex-1 px-16 xl:px-24">
         <div className="flex items-center gap-3 mb-8">
           <div className="flex items-center justify-center size-12 bg-[#10B981] rounded-xl text-white">
@@ -83,9 +81,7 @@ function LoginContent() {
         </div>
       </div>
 
-      {/* Right — Sign-in */}
       <div className="flex flex-col items-center justify-center flex-1 lg:max-w-md px-6">
-        {/* Mobile branding */}
         <div className="flex flex-col items-center gap-3 mb-8 lg:hidden">
           <div className="flex items-center justify-center size-14 bg-[#10B981] rounded-2xl text-white">
             <span className="material-symbols-outlined text-3xl">strategy</span>

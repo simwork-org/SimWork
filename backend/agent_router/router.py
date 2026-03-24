@@ -724,6 +724,9 @@ def _friendly_failure_message(warnings: list[str]) -> str:
 
     combined = " ".join(w.lower() for w in warnings)
 
+    if "attempt limit" in combined:
+        return "I tried multiple approaches but couldn't get the right result within the attempt limit. Could you try rephrasing the question or breaking it into simpler parts?"
+
     if "unauthorized" in combined or "not allowed" in combined:
         return "I don't have access to the data source needed for this question. You could try asking about a different table, or rephrase your question to use the data I do have access to."
 
@@ -738,9 +741,6 @@ def _friendly_failure_message(warnings: list[str]) -> str:
 
     if "returned no rows" in combined or "no rows" in combined:
         return "The query ran but returned no matching data. You might want to try a broader date range or different filters."
-
-    if "attempt limit" in combined:
-        return "I tried multiple approaches but couldn't get the right result. Could you try rephrasing the question or breaking it into simpler parts?"
 
     # Default: don't dump raw warning text
     return "I wasn't able to complete this query. Try rephrasing the question or breaking it into smaller steps — that usually helps me get to the right answer."

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
@@ -117,10 +118,13 @@ export default function ScenariosPage() {
             {authSession?.user && (
               <div className="flex items-center gap-3">
                 {authSession.user.image && (
-                  <img
+                  <Image
                     src={authSession.user.image}
                     alt=""
                     className="size-8 rounded-full"
+                    width={32}
+                    height={32}
+                    unoptimized
                     referrerPolicy="no-referrer"
                   />
                 )}

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 import os
 from pathlib import Path
 
@@ -19,12 +20,19 @@ from fastapi import FastAPI  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 
 from api.routes import router  # noqa: E402
-from investigation_logger.logger import clear_all_session_data, init_db  # noqa: E402
+from investigation_logger.logger import init_db  # noqa: E402
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    init_db()
+    yield
 
 app = FastAPI(
     title="SimWork API",
     description="Simulation platform for evaluating investigation and decision-making skills",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 # CORS
@@ -39,12 +47,6 @@ app.add_middleware(
 )
 
 app.include_router(router)
-
-
-@app.on_event("startup")
-def on_startup():
-    init_db()
-    clear_all_session_data()
 
 
 @app.get("/health")

@@ -68,7 +68,6 @@ function DemoForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
-    // TODO: wire to backend API or email service
     await new Promise((r) => setTimeout(r, 800));
     setSubmitted(true);
     setSubmitting(false);
@@ -146,7 +145,6 @@ function CTASection({ showForm, setShowForm }: { showForm: boolean; setShowForm:
   return (
     <section id="cta" className="max-w-4xl mx-auto px-6 py-24">
       <div className="relative rounded-2xl overflow-hidden">
-        {/* Gradient glow */}
         <div className="absolute inset-0 bg-gradient-to-r from-[#10B981]/20 via-transparent to-[#10B981]/10 blur-xl" />
         <div className="relative rounded-2xl border border-slate-800 bg-[#101122] p-10 md:p-16 text-center">
           {showForm && (
@@ -232,7 +230,6 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen text-white" style={BG_STYLE}>
-      {/* ── Nav ── */}
       <nav className="sticky top-0 z-50 flex items-center justify-between px-6 md:px-12 py-4 bg-[#101122]/80 backdrop-blur-xl border-b border-slate-800">
         <div className="flex items-center gap-2.5">
           <div className="flex items-center justify-center size-9 bg-[#10B981] rounded-lg text-white">
@@ -241,24 +238,16 @@ export default function HomePage() {
           <span className="text-lg font-bold tracking-tight">SimWork</span>
         </div>
         <div className="flex items-center gap-6">
-          <Link
-            href="/login"
-            className="text-sm text-slate-300 hover:text-white transition-colors"
-          >
+          <Link href="/login" className="text-sm text-slate-300 hover:text-white transition-colors">
             Login
           </Link>
-          <Link
-            href="/login"
-            className="rounded-lg px-5 py-2.5 bg-[#10B981] text-sm font-bold text-white hover:bg-emerald-600 transition-colors"
-          >
+          <Link href="/login" className="rounded-lg px-5 py-2.5 bg-[#10B981] text-sm font-bold text-white hover:bg-emerald-600 transition-colors">
             Sign Up
           </Link>
         </div>
       </nav>
 
-      {/* ── Hero ── */}
       <section className="relative min-h-[90vh] flex flex-col items-center justify-center text-center px-6 overflow-hidden">
-        {/* Glow orb */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-[#10B981]/[0.08] blur-[120px] pointer-events-none" />
 
         <div className="relative z-10 max-w-3xl">
@@ -296,7 +285,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── Why SimWork ── */}
       <section className="max-w-6xl mx-auto px-6 py-24">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {DIFFERENTIATORS.map((d) => (
@@ -316,14 +304,12 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── How It Works ── */}
       <section id="how-it-works" className="max-w-6xl mx-auto px-6 py-24">
         <h2 className="text-3xl md:text-4xl font-black text-center mb-16">
           How It Works
         </h2>
 
         <div className="relative grid grid-cols-1 md:grid-cols-3 gap-12 md:gap-8">
-          {/* Connecting dashed line (desktop) */}
           <div className="hidden md:block absolute top-[52px] left-[16.67%] right-[16.67%] border-t-2 border-dashed border-[#10B981]/30 -z-0" />
 
           {STEPS.map((step, i) => (
@@ -344,7 +330,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── Stats ── */}
       <section className="max-w-5xl mx-auto px-6 py-16">
         <div className="flex flex-col md:flex-row items-center justify-center gap-12 md:gap-0">
           {STATS.map((s, i) => (
@@ -363,10 +348,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── CTA ── */}
       <CTASection showForm={showDemoForm} setShowForm={setShowDemoForm} />
 
-      {/* ── Footer ── */}
       <footer className="border-t border-slate-800 py-8 px-6">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4 text-slate-500 text-sm">
           <p>&copy; 2026 SimWork Inc. All rights reserved.</p>
@@ -377,10 +360,7 @@ export default function HomePage() {
             <a className="hover:text-[#10B981] transition-colors" href="#">
               Terms of Service
             </a>
-            <Link
-              className="hover:text-[#10B981] transition-colors"
-              href="/login"
-            >
+            <Link className="hover:text-[#10B981] transition-colors" href="/login">
               Candidate Login
             </Link>
           </div>

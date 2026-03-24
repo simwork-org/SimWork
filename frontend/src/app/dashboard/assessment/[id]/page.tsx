@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -175,7 +176,14 @@ export default function AssessmentDetailPage() {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           {c.picture && (
-                            <img src={c.picture} alt="" className="size-7 rounded-full" />
+                            <Image
+                              src={c.picture}
+                              alt=""
+                              className="size-7 rounded-full"
+                              width={28}
+                              height={28}
+                              unoptimized
+                            />
                           )}
                           <div>
                             <p className="text-white font-medium">{c.name || "Unknown"}</p>
