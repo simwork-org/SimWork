@@ -1,117 +1,42 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useMemo, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuthToken } from "@/lib/useAuthToken";
 import {
   getMe,
   getMySessions,
+  getQueryHistory,
   getSavedEvidence,
+  getScenarioDetails,
   getScoringResult,
+  getSubmission,
   triggerScoring,
   type Artifact,
-  type DimensionScore,
+  type QueryHistoryItem,
   type SavedEvidence,
+  type ScenarioDetail,
   type ScoringResult,
+  type SessionSubmission,
 } from "@/lib/api";
+import { buildAssessmentReportModel } from "@/lib/assessment-report";
 import { findAssignedSession } from "@/lib/auth-routing";
 
-const DIMENSION_LABELS: Record<string, string> = {
-  root_cause_identification: "Root Cause Identification",
-  investigation_methodology: "Investigation Methodology",
-  solution_quality: "Solution Quality",
-  communication: "Communication",
+const RECOMMENDATION_STYLES: Record<string, string> = {
+  "Strong Hire": "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+  Hire: "bg-sky-500/15 text-sky-300 border-sky-500/30",
+  Mixed: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+  "No Hire": "bg-red-500/15 text-red-300 border-red-500/30",
 };
-
-const LEVEL_COLORS: Record<string, string> = {
-  excellent: "text-emerald-500",
-  good: "text-sky-500",
-  adequate: "text-amber-500",
-  poor: "text-red-500",
-};
-
-const BAR_COLORS: Record<string, string> = {
-  excellent: "bg-emerald-500",
-  good: "bg-sky-500",
-  adequate: "bg-amber-500",
-  poor: "bg-red-500",
-};
-
-function scoreColor(score: number): string {
-  if (score >= 4.5) return "text-emerald-500 border-emerald-500";
-  if (score >= 3.5) return "text-sky-500 border-sky-500";
-  if (score >= 2.5) return "text-amber-500 border-amber-500";
-  return "text-red-500 border-red-500";
-}
-
-function ScoreCircle({ score }: { score: number }) {
-  return (
-    <div className={`flex items-center justify-center size-24 rounded-full border-4 ${scoreColor(score)}`}>
-      <span className="text-3xl font-bold">{score.toFixed(1)}</span>
-    </div>
-  );
-}
-
-function DimensionCard({ name, dim }: { name: string; dim: DimensionScore }) {
-  const label = DIMENSION_LABELS[name] || name.replace(/_/g, " ");
-  const barWidth = `${(dim.score / 5) * 100}%`;
-  const barColor = BAR_COLORS[dim.level] || "bg-slate-400";
-  const levelColor = LEVEL_COLORS[dim.level] || "text-slate-400";
-
-  return (
-    <div className="bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">{label}</h3>
-        <div className="flex items-center gap-2">
-          <span className={`text-xs font-semibold uppercase ${levelColor}`}>{dim.level}</span>
-          <span className="text-lg font-bold text-slate-900 dark:text-slate-100">{dim.score}/5</span>
-        </div>
-      </div>
-      <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full mb-3">
-        <div className={`h-2 rounded-full ${barColor} transition-all`} style={{ width: barWidth }} />
-      </div>
-      <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">{dim.reasoning}</p>
-      <p className="text-[10px] text-slate-400 mt-2">Weight: {(dim.weight * 100).toFixed(0)}%</p>
-    </div>
-  );
-}
-
-function StatCard({ label, value, icon }: { label: string; value: string | number; icon: string }) {
-  return (
-    <div className="bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-lg p-4 text-center">
-      <span className="material-symbols-outlined text-slate-400 text-xl mb-1 block">{icon}</span>
-      <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{value}</p>
-      <p className="text-[11px] text-slate-500 mt-1">{label}</p>
-    </div>
-  );
-}
-
-function BulletList({ title, items, icon, color }: { title: string; items: string[]; icon: string; color: string }) {
-  if (items.length === 0) return null;
-  return (
-    <div>
-      <div className="flex items-center gap-2 mb-3">
-        <span className={`material-symbols-outlined text-sm ${color}`}>{icon}</span>
-        <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">{title}</h3>
-      </div>
-      <ul className="space-y-2">
-        {items.map((item, index) => (
-          <li key={index} className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed pl-4 relative">
-            <span className={`absolute left-0 top-1.5 size-1.5 rounded-full ${color.replace("text-", "bg-")}`} />
-            {item}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
 
 function ReviewVegaChart({ spec }: { spec: Record<string, unknown> }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<unknown>(null);
+
   useEffect(() => {
     if (!containerRef.current) return;
     let cancelled = false;
+
     import("vega-embed").then(({ default: vegaEmbed }) => {
       if (cancelled || !containerRef.current) return;
       vegaEmbed(containerRef.current, spec as never, {
@@ -124,8 +49,11 @@ function ReviewVegaChart({ spec }: { spec: Record<string, unknown> }) {
           legend: { labelColor: "#94a3b8", titleColor: "#94a3b8" },
           title: { color: "#e2e8f0" },
         },
-      }).then((result) => { viewRef.current = result.view; });
+      }).then((result) => {
+        viewRef.current = result.view;
+      });
     });
+
     return () => {
       cancelled = true;
       if (viewRef.current && typeof (viewRef.current as { finalize?: () => void }).finalize === "function") {
@@ -133,6 +61,7 @@ function ReviewVegaChart({ spec }: { spec: Record<string, unknown> }) {
       }
     };
   }, [spec]);
+
   return <div ref={containerRef} className="w-full" />;
 }
 
@@ -169,13 +98,14 @@ function ReviewArtifactView({ artifact }: { artifact: Artifact }) {
           </tbody>
         </table>
         {artifact.rows.length > 5 && (
-          <p className="text-[10px] text-slate-400 px-3 py-1 bg-slate-50 dark:bg-slate-800/40">+{artifact.rows.length - 5} more rows</p>
+          <p className="text-[10px] text-slate-400 px-3 py-1 bg-slate-50 dark:bg-slate-800/40">
+            +{artifact.rows.length - 5} more rows
+          </p>
         )}
       </div>
     );
   }
 
-  // Vega-Lite chart
   if (artifact.kind === "vega_chart") {
     return (
       <div className="mt-3">
@@ -184,7 +114,6 @@ function ReviewArtifactView({ artifact }: { artifact: Artifact }) {
     );
   }
 
-  // Legacy chart — render a simple bar/line preview
   if (artifact.kind === "chart") {
     const series = artifact.series[0];
     if (!series || series.values.length === 0) return null;
@@ -201,13 +130,10 @@ function ReviewArtifactView({ artifact }: { artifact: Artifact }) {
             <polyline points={pts.map((p) => `${p.x},${p.y}`).join(" ")} fill="none" stroke="#10b981" strokeWidth="2" />
             {pts.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r="2.5" fill="#10b981" />)}
           </svg>
-          <div className="flex justify-between text-[9px] text-slate-400 px-1">
-            <span>{artifact.labels[0]}</span>
-            <span>{artifact.labels[artifact.labels.length - 1]}</span>
-          </div>
         </div>
       );
     }
+
     return (
       <div className="mt-3 flex items-end gap-1 h-16">
         {series.values.slice(0, 12).map((v, i) => (
@@ -228,6 +154,46 @@ function ReviewArtifactView({ artifact }: { artifact: Artifact }) {
   return null;
 }
 
+function MetricTile({ label, value, helper }: { label: string; value: string | number; helper: string }) {
+  return (
+    <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 p-4">
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{label}</p>
+      <p className="mt-2 text-2xl font-bold text-slate-900 dark:text-slate-100">{value}</p>
+      <p className="mt-2 text-xs leading-relaxed text-slate-500">{helper}</p>
+    </div>
+  );
+}
+
+function CapabilityCard({
+  label,
+  score,
+  reasoning,
+  weight,
+}: {
+  label: string;
+  score: number;
+  reasoning: string;
+  weight: number;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">{label}</h3>
+          <p className="mt-3 text-xs leading-relaxed text-slate-600 dark:text-slate-400">{reasoning}</p>
+        </div>
+        <div className="text-right shrink-0">
+          <p className="text-2xl font-black text-slate-900 dark:text-white">{score}</p>
+          <p className="text-[10px] uppercase tracking-wider text-slate-500">Weight {(weight * 100).toFixed(0)}%</p>
+        </div>
+      </div>
+      <div className="mt-4 h-2 rounded-full bg-slate-100 dark:bg-slate-800">
+        <div className="h-2 rounded-full bg-[#10B981]" style={{ width: `${score}%` }} />
+      </div>
+    </div>
+  );
+}
+
 export default function ReviewPage() {
   const router = useRouter();
   const params = useParams();
@@ -236,8 +202,11 @@ export default function ReviewPage() {
 
   const [scoring, setScoring] = useState<ScoringResult | null>(null);
   const [evidence, setEvidence] = useState<SavedEvidence[]>([]);
+  const [submission, setSubmission] = useState<SessionSubmission | null>(null);
+  const [queryHistory, setQueryHistory] = useState<QueryHistoryItem[]>([]);
+  const [scenario, setScenario] = useState<ScenarioDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [scoring_loading, setScoringLoading] = useState(false);
+  const [scoringLoading, setScoringLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -258,14 +227,11 @@ export default function ReviewPage() {
         const assignedSession = findAssignedSession(sessions);
         router.replace(assignedSession ? `/briefing/${assignedSession.session_id}` : "/candidate");
       } catch {
-        if (!cancelled) {
-          router.replace("/login?role=company");
-        }
+        if (!cancelled) router.replace("/login?role=company");
       }
     }
 
     validateRole();
-
     return () => {
       cancelled = true;
     };
@@ -274,20 +240,39 @@ export default function ReviewPage() {
   useEffect(() => {
     async function load() {
       try {
-        const [scoreRes, evidenceRes] = await Promise.allSettled([
+        const [scoreRes, evidenceRes, submissionRes, historyRes, scenarioRes] = await Promise.allSettled([
           getScoringResult(sessionId),
           getSavedEvidence(sessionId),
+          getSubmission(sessionId),
+          getQueryHistory(sessionId),
+          getScenarioDetails(sessionId),
         ]);
+
         if (scoreRes.status === "fulfilled") setScoring(scoreRes.value);
         if (evidenceRes.status === "fulfilled") setEvidence(evidenceRes.value.evidence);
+        if (submissionRes.status === "fulfilled") setSubmission(submissionRes.value);
+        if (historyRes.status === "fulfilled") setQueryHistory(historyRes.value.queries);
+        if (scenarioRes.status === "fulfilled") setScenario(scenarioRes.value);
       } catch {
-        // Score may not exist yet — that's OK
+        setError("Failed to load candidate report data.");
       } finally {
         setLoading(false);
       }
     }
+
     load();
   }, [sessionId]);
+
+  const report = useMemo(() => {
+    if (!scoring || !submission || !scenario) return null;
+    return buildAssessmentReportModel({
+      scenario,
+      scoring,
+      submission,
+      evidence,
+      queryHistory,
+    });
+  }, [scoring, submission, scenario, evidence, queryHistory]);
 
   const handleGenerateScore = async () => {
     setScoringLoading(true);
@@ -307,14 +292,14 @@ export default function ReviewPage() {
       <div className="flex min-h-screen items-center justify-center bg-[#f6f6f8] dark:bg-[#101122]">
         <div className="flex items-center gap-3 text-slate-500">
           <span className="material-symbols-outlined animate-spin">progress_activity</span>
-          Loading review...
+          Loading report...
         </div>
       </div>
     );
   }
 
   return (
-    <div className="relative flex min-h-screen w-full flex-col bg-[#f6f6f8] dark:bg-[#101122]" style={{ fontFamily: "'Inter', sans-serif" }}>
+    <div className="relative flex min-h-screen w-full flex-col bg-[#f6f6f8] dark:bg-[#101122]">
       <header className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 px-6 py-4 lg:px-10 bg-white dark:bg-slate-900">
         <div className="flex items-center gap-3">
           <div className="flex h-8 w-8 items-center justify-center rounded bg-[#10B981] text-white">
@@ -322,147 +307,229 @@ export default function ReviewPage() {
           </div>
           <h2 className="text-slate-900 dark:text-slate-100 text-lg font-bold tracking-tight">SimWork</h2>
           <span className="text-slate-400 mx-2">/</span>
-          <span className="text-slate-500 text-sm font-medium">Candidate Review</span>
+          <span className="text-slate-500 text-sm font-medium">Assessment Report</span>
         </div>
+        {report && (
+          <button
+            onClick={() => window.print()}
+            className="inline-flex items-center gap-2 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 font-semibold py-2 px-4 rounded-lg text-sm transition-all"
+          >
+            <span className="material-symbols-outlined text-sm">download</span>
+            Download PDF
+          </button>
+        )}
       </header>
 
       <main className="flex-1 overflow-y-auto px-6 py-8 lg:px-10">
-        <div className="max-w-5xl mx-auto space-y-8">
-
-          {/* Print-only header */}
-          <div className="hidden print:block print-header mb-6">
-            <h1 className="text-2xl font-bold text-slate-900">SimWork — Candidate Evaluation Report</h1>
-            <p className="text-sm text-slate-500 mt-1">
-              Session: {sessionId} · Printed: {new Date().toLocaleDateString()}
-            </p>
-          </div>
-
-          {/* No score yet */}
+        <div className="max-w-6xl mx-auto space-y-8">
           {!scoring && (
-            <div className="bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl p-8 text-center">
+            <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 p-8 text-center">
               <span className="material-symbols-outlined text-4xl text-slate-300 dark:text-slate-600 mb-4 block">grading</span>
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Score not yet generated</h2>
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Assessment report not generated yet</h2>
               <p className="text-sm text-slate-500 mb-6">
-                Generate an AI-powered evaluation of this candidate&apos;s investigation and submission.
+                Generate the hiring-manager report to summarize the candidate&apos;s PM judgment, investigation quality, and recommendation strength.
               </p>
-              {error && (
-                <p className="text-sm text-red-500 mb-4">{error}</p>
-              )}
+              {error && <p className="text-sm text-red-500 mb-4">{error}</p>}
               <button
                 onClick={handleGenerateScore}
-                disabled={scoring_loading}
+                disabled={scoringLoading}
                 className="inline-flex items-center gap-2 bg-[#10B981] hover:bg-[#10B981]/90 text-white font-bold py-3 px-6 rounded-xl transition-all disabled:opacity-50"
               >
-                {scoring_loading ? (
+                {scoringLoading ? (
                   <>
                     <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
-                    Scoring...
+                    Generating...
                   </>
                 ) : (
                   <>
                     <span className="material-symbols-outlined text-sm">auto_awesome</span>
-                    Generate Score
+                    Generate Report
                   </>
                 )}
               </button>
             </div>
           )}
 
-          {/* Scoring results */}
-          {scoring && (
+          {scoring && report && submission && scenario && (
             <>
-              {/* Header with overall score */}
-              <div className="bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl p-8 flex items-center justify-between">
-                <div>
-                  <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight mb-1">Candidate Evaluation</h1>
-                  <p className="text-sm text-slate-500">
-                    Session: {sessionId}
-                    {scoring.scored_at && ` · Scored: ${new Date(scoring.scored_at).toLocaleDateString()}`}
-                  </p>
-                </div>
-                <div className="flex items-center gap-4">
-                  <button
-                    onClick={() => window.print()}
-                    className="print:hidden inline-flex items-center gap-2 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 font-semibold py-2 px-4 rounded-lg text-sm transition-all"
-                  >
-                    <span className="material-symbols-outlined text-sm">download</span>
-                    Download PDF
-                  </button>
-                  <ScoreCircle score={scoring.overall_score} />
-                </div>
-              </div>
+              <section className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 p-8">
+                <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="max-w-3xl">
+                    <p className="text-xs font-bold uppercase tracking-widest text-[#10B981] mb-3">Hiring Manager Summary</p>
+                    <h1 className="text-3xl lg:text-4xl font-black tracking-tight text-slate-900 dark:text-white">
+                      {report.scenarioTitle}
+                    </h1>
+                    <p className="mt-3 text-sm text-slate-500">
+                      Session {sessionId} · Submitted {new Date(submission.timestamp).toLocaleString()}
+                    </p>
+                    <p className="mt-5 text-base leading-relaxed text-slate-600 dark:text-slate-300">
+                      {report.executiveSummary}
+                    </p>
+                    <div className="mt-6 flex flex-wrap gap-3">
+                      <span className={`rounded-full border px-3 py-1.5 text-sm font-bold ${RECOMMENDATION_STYLES[report.recommendation]}`}>
+                        {report.recommendation}
+                      </span>
+                      <span className="rounded-full border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-sm font-semibold text-slate-600 dark:text-slate-300">
+                        Confidence: {report.confidence}
+                      </span>
+                      <span className="rounded-full border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-sm font-semibold text-slate-600 dark:text-slate-300">
+                        Overall Score: {report.overallScore}/100
+                      </span>
+                    </div>
+                  </div>
 
-              {/* Dimension scores */}
-              <section>
-                <h2 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-4 uppercase tracking-wide">Dimension Scores</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {Object.entries(scoring.dimensions).map(([name, dim]) => (
-                    <DimensionCard key={name} name={name} dim={dim} />
-                  ))}
-                </div>
-              </section>
-
-              {/* Process signals */}
-              <section>
-                <h2 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-4 uppercase tracking-wide">Investigation Process</h2>
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                  <StatCard label="Total Queries" value={scoring.process_signals.total_queries} icon="forum" />
-                  <StatCard label="Evidence Saved" value={scoring.process_signals.evidence_saved_count} icon="bookmark" />
-                  <StatCard label="Agents Used" value={Object.keys(scoring.process_signals.agents_used).length} icon="groups" />
-                  <StatCard
-                    label="Typed / Suggested"
-                    value={`${scoring.process_signals.typed_vs_suggestion.typed}/${scoring.process_signals.typed_vs_suggestion.suggestion}`}
-                    icon="keyboard"
-                  />
-                  <StatCard label="Duration (min)" value={scoring.process_signals.session_duration_minutes} icon="timer" />
-                </div>
-
-                {/* Agent breakdown */}
-                <div className="mt-4 bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
-                  <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">Agent Query Distribution</h3>
-                  <div className="flex gap-6">
-                    {Object.entries(scoring.process_signals.agents_used).map(([agent, count]) => (
-                      <div key={agent} className="flex items-center gap-2">
-                        <span className="text-sm font-semibold text-slate-900 dark:text-slate-100 capitalize">{agent.replace(/_/g, " ")}</span>
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold">
-                          {count}
-                        </span>
-                      </div>
+                  <div className="grid grid-cols-2 gap-3 min-w-[280px]">
+                    {report.quantMetrics.slice(0, 4).map((metric) => (
+                      <MetricTile key={metric.label} label={metric.label} value={metric.value} helper={metric.helper} />
                     ))}
                   </div>
                 </div>
               </section>
 
-              {/* Highlights / Missed / Red Herrings */}
-              <section>
-                <h2 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-4 uppercase tracking-wide">Key Signals</h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl p-6">
-                  <BulletList title="Highlights" items={scoring.highlights} icon="check_circle" color="text-emerald-500" />
-                  <BulletList title="Missed Signals" items={scoring.missed_signals} icon="warning" color="text-amber-500" />
-                  <BulletList title="Red Herrings Engaged" items={scoring.red_herrings_engaged} icon="nearby_error" color="text-red-400" />
+              <section className="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-6">
+                <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 p-6">
+                  <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 mb-4">Scenario Context</h2>
+                  <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">{report.scenarioSummary}</p>
+
+                  <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {report.timeline.map((item) => (
+                      <div key={item.label} className="rounded-xl bg-slate-50 dark:bg-slate-800/40 p-4">
+                        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{item.label}</p>
+                        <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-slate-100">{item.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 p-6">
+                  <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 mb-4">Decision Signals</h2>
+                  <div className="space-y-4">
+                    <div className="rounded-xl bg-slate-50 dark:bg-slate-800/40 p-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Top Strengths</p>
+                      <ul className="mt-3 space-y-2 text-sm text-slate-700 dark:text-slate-300">
+                        {report.strengths.map((item, index) => (
+                          <li key={index} className="leading-relaxed">{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div className="rounded-xl bg-slate-50 dark:bg-slate-800/40 p-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Primary Risks</p>
+                      <ul className="mt-3 space-y-2 text-sm text-slate-700 dark:text-slate-300">
+                        {report.risks.map((item, index) => (
+                          <li key={index} className="leading-relaxed">{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
                 </div>
               </section>
 
-              {/* Saved evidence */}
+              <section>
+                <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 mb-4">Scenario-Specific Capability Signals</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {report.capabilitySignals.map((signal) => (
+                    <CapabilityCard
+                      key={signal.key}
+                      label={signal.label}
+                      score={signal.normalizedScore}
+                      reasoning={signal.reasoning}
+                      weight={signal.weight}
+                    />
+                  ))}
+                </div>
+              </section>
+
+              <section>
+                <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 mb-4">Quantified Evaluation Metrics</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {report.quantMetrics.map((metric) => (
+                    <MetricTile key={metric.label} label={metric.label} value={metric.value} helper={metric.helper} />
+                  ))}
+                </div>
+              </section>
+
+              <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 p-6">
+                  <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 mb-4">Candidate Submission</h2>
+                  <div className="space-y-5">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-2">Root Cause / Core Recommendation</p>
+                      <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-300">{submission.root_cause}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-2">Stakeholder Summary</p>
+                      <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-300">{submission.stakeholder_summary}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-2">Proposed Actions</p>
+                      <div className="space-y-2">
+                        {submission.proposed_actions.map((action, index) => (
+                          <div key={`${action.action}-${index}`} className="rounded-xl bg-slate-50 dark:bg-slate-800/40 p-3">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="rounded-full bg-[#10B981]/10 px-2 py-0.5 text-[10px] font-bold text-[#10B981]">{action.priority}</span>
+                            </div>
+                            <p className="text-sm text-slate-700 dark:text-slate-300">{action.action}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 p-6">
+                  <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 mb-4">Evidence and Investigation Quality</h2>
+                  <div className="grid grid-cols-2 gap-4">
+                    <MetricTile
+                      label="Supporting Evidence"
+                      value={report.evidenceInsights.linkedEvidenceCount}
+                      helper="Evidence items explicitly linked into the final submission."
+                    />
+                    <MetricTile
+                      label="Annotated Evidence"
+                      value={report.evidenceInsights.annotatedEvidenceCount}
+                      helper="Saved evidence with candidate-written explanation of why it mattered."
+                    />
+                    <MetricTile
+                      label="Findings Coverage"
+                      value={`${report.evidenceInsights.findingsCoverage}%`}
+                      helper="Critical scenario findings captured versus missed."
+                    />
+                    <MetricTile
+                      label="Red Herrings"
+                      value={report.evidenceInsights.redHerringsEngaged}
+                      helper="Misleading signals the candidate spent material effort on."
+                    />
+                    <MetricTile
+                      label="Evidence Linkage"
+                      value={`${report.evidenceInsights.evidenceLinkageScore}/100`}
+                      helper="How tightly the final case is supported by preserved evidence."
+                    />
+                    <MetricTile
+                      label="Investigation Breadth"
+                      value={`${report.decisionInsights.investigationBreadthScore}/100`}
+                      helper="Coverage across teammates, evidence, and inquiry depth."
+                    />
+                  </div>
+                </div>
+              </section>
+
               {evidence.length > 0 && (
                 <section>
-                  <h2 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-4 uppercase tracking-wide">
-                    Candidate&apos;s Saved Evidence ({evidence.length} items)
-                  </h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 mb-4">Evidence Appendix</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {evidence.map((item) => (
-                      <div key={item.id} className="bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl p-4">
+                      <div key={item.id} className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 p-5">
                         <div className="flex items-center gap-2 mb-2">
                           <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold capitalize">
                             {item.agent.replace(/_/g, " ")}
                           </span>
-                          <span className="text-[10px] text-slate-400">{item.artifact.kind}</span>
+                          <span className="text-[10px] text-slate-400 uppercase tracking-wider">{item.artifact.kind}</span>
                         </div>
                         <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{item.artifact.title}</p>
                         <ReviewArtifactView artifact={item.artifact} />
                         {item.annotation && (
                           <div className="mt-3 rounded-lg bg-emerald-500/8 dark:bg-emerald-500/10 border-l-2 border-emerald-500 px-3 py-2">
-                            <p className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 mb-0.5">Why this matters</p>
+                            <p className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 mb-0.5">Candidate note</p>
                             <p className="text-xs text-slate-700 dark:text-slate-200 leading-relaxed">{item.annotation}</p>
                           </div>
                         )}
@@ -472,7 +539,31 @@ export default function ReviewPage() {
                   </div>
                 </section>
               )}
+
+              <section className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 p-6">
+                <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 mb-4">Investigation Appendix</h2>
+                <div className="space-y-3">
+                  {queryHistory.slice(-8).reverse().map((query) => (
+                    <div key={query.query_log_id} className="rounded-xl bg-slate-50 dark:bg-slate-800/40 p-4">
+                      <div className="flex items-center justify-between gap-3 mb-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-[#10B981]">
+                          {query.agent.replace(/_/g, " ")}
+                        </span>
+                        <span className="text-[11px] text-slate-500">{new Date(query.timestamp).toLocaleString()}</span>
+                      </div>
+                      <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{query.query}</p>
+                      <p className="mt-2 text-xs leading-relaxed text-slate-600 dark:text-slate-400 line-clamp-3">{query.response}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
             </>
+          )}
+
+          {scoring && (!report || !submission || !scenario) && (
+            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-6 text-amber-100">
+              The score exists, but the full assessment report could not be assembled because submission or scenario data is missing.
+            </div>
           )}
         </div>
       </main>

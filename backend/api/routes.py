@@ -34,6 +34,7 @@ from simulation_engine.engine import (
     handle_get_query_log,
     handle_get_saved_evidence,
     handle_get_score,
+    handle_get_submission,
     handle_log_event,
     handle_query,
     handle_query_stream,
@@ -241,6 +242,14 @@ def api_get_score(session_id: str, user: dict = Depends(get_current_user)):
         return handle_get_score(session_id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail={"error": "score_not_found", "message": str(exc)})
+
+
+@router.get("/sessions/{session_id}/submission")
+def api_get_submission(session_id: str, user: dict = Depends(get_current_user)):
+    try:
+        return handle_get_submission(session_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail={"error": "submission_not_found", "message": str(exc)})
 
 
 @router.get("/me")

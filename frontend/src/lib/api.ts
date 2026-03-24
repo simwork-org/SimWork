@@ -227,6 +227,16 @@ export interface ProposedAction {
   priority: "P0" | "P1" | "P2";
 }
 
+export interface SessionSubmission {
+  id: number;
+  session_id: string;
+  root_cause: string;
+  proposed_actions: ProposedAction[];
+  stakeholder_summary: string;
+  supporting_evidence_ids: number[];
+  timestamp: string;
+}
+
 export interface DimensionScore {
   score: number;
   level: string;
@@ -505,6 +515,12 @@ export async function getScoringResult(
   sessionId: string
 ): Promise<ScoringResult> {
   return fetchJSON(`${PREFIX}/sessions/${sessionId}/score`);
+}
+
+export async function getSubmission(
+  sessionId: string
+): Promise<SessionSubmission> {
+  return fetchJSON(`${PREFIX}/sessions/${sessionId}/submission`);
 }
 
 export async function getQueryLogDetail(

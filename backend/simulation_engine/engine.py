@@ -18,6 +18,7 @@ from investigation_logger.logger import (
     get_scoring_result,
     get_session,
     get_session_events,
+    get_submission,
     log_query,
     log_session_event,
     remove_evidence,
@@ -344,3 +345,13 @@ def handle_get_score(session_id: str) -> dict[str, Any]:
     if result is None:
         raise ValueError(f"No scoring result for session: {session_id}")
     return result
+
+
+def handle_get_submission(session_id: str) -> dict[str, Any]:
+    session = get_session(session_id)
+    if session is None:
+        raise ValueError(f"Session not found: {session_id}")
+    submission = get_submission(session_id)
+    if submission is None:
+        raise ValueError(f"No submission found for session: {session_id}")
+    return submission
