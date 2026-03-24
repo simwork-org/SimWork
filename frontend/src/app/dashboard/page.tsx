@@ -3,11 +3,13 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { signOut } from "next-auth/react";
 import {
   Assessment,
   Scenario,
   Challenge,
   getMe,
+  getMySessions,
   getMyCompany,
   createCompany,
   listAssessments,
@@ -17,10 +19,12 @@ import {
   generateInvite,
 } from "@/lib/api";
 import { useAuthToken } from "@/lib/useAuthToken";
+import { findAssignedSession } from "@/lib/auth-routing";
 
 export default function DashboardPage() {
   const session = useAuthToken();
   const router = useRouter();
+  const [notice, setNotice] = useState("");
 
   const [companyName, setCompanyName] = useState("");
   const [needsCompany, setNeedsCompany] = useState(false);
@@ -38,8 +42,12 @@ export default function DashboardPage() {
   const [assessmentTitle, setAssessmentTitle] = useState("");
   const [creating, setCreating] = useState(false);
 
-  // Quick invite copy
-  const [copiedToken, setCopiedToken] = useState("");
+  const [inviteEmails, setInviteEmails] = useState<Record<string, string>>({});
+  const [inviteStatus, setInviteStatus] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    setNotice(new URLSearchParams(window.location.search).get("notice") || "");
+  }, []);
 
   useEffect(() => {
     if (!session) return;
@@ -48,7 +56,9 @@ export default function DashboardPage() {
       try {
         const me = await getMe();
         if (me.role !== "company") {
-          router.replace("/");
+          const { sessions } = await getMySessions();
+          const assignedSession = findAssignedSession(sessions);
+          router.replace(assignedSession ? `/briefing/${assignedSession.session_id}` : "/candidate");
           return;
         }
 
@@ -64,7 +74,7 @@ export default function DashboardPage() {
         const { assessments: list } = await listAssessments();
         setAssessments(list);
       } catch {
-        router.replace("/login");
+        router.replace("/login?role=company");
       } finally {
         setLoading(false);
       }
@@ -120,12 +130,24 @@ export default function DashboardPage() {
     setAssessments(list);
   };
 
-  const handleQuickInvite = async (assessmentId: string) => {
-    const { invite_url } = await generateInvite(assessmentId);
+  const handleQuickInvite = async (assessmentId: string, candidateEmail?: string) => {
+    const { invite_url } = await generateInvite(assessmentId, candidateEmail);
     const fullUrl = `${window.location.origin}${invite_url}`;
     await navigator.clipboard.writeText(fullUrl);
-    setCopiedToken(assessmentId);
-    setTimeout(() => setCopiedToken(""), 2000);
+    setInviteStatus((current) => ({
+      ...current,
+      [assessmentId]: candidateEmail ? "Email-bound invite copied." : "Open invite copied.",
+    }));
+    if (candidateEmail) {
+      setInviteEmails((current) => ({ ...current, [assessmentId]: "" }));
+    }
+    setTimeout(() => {
+      setInviteStatus((current) => {
+        const next = { ...current };
+        delete next[assessmentId];
+        return next;
+      });
+    }, 2500);
   };
 
   if (!session) return null;
@@ -173,12 +195,20 @@ export default function DashboardPage() {
             <span className="text-sm text-slate-400 ml-2">/ {companyName}</span>
           )}
         </div>
-        <Link href="/login" className="text-sm text-slate-400 hover:text-white transition-colors">
+        <button
+          onClick={() => signOut({ callbackUrl: "/" })}
+          className="text-sm text-slate-400 hover:text-white transition-colors"
+        >
           Sign Out
-        </Link>
+        </button>
       </nav>
 
       <div className="max-w-5xl mx-auto px-6 py-10">
+        {notice === "candidate-access-company" && (
+          <div className="mb-6 rounded-xl border border-sky-500/30 bg-sky-500/10 px-4 py-3 text-sm text-sky-200">
+            Candidate Access is invite-first. Use Company Sign In for employer work, or open a candidate invite link if you need to enter an assessment as a participant.
+          </div>
+        )}
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-2xl font-bold">Your Assessments</h1>
           <button
@@ -243,11 +273,37 @@ export default function DashboardPage() {
                     onClick={() => handleQuickInvite(a.id)}
                     className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium bg-[#10B981]/10 text-[#10B981] hover:bg-[#10B981]/20 transition-colors"
                   >
-                    <span className="material-symbols-outlined text-base">
-                      {copiedToken === a.id ? "check" : "link"}
-                    </span>
-                    {copiedToken === a.id ? "Copied!" : "Copy Invite Link"}
+                    <span className="material-symbols-outlined text-base">link</span>
+                    Copy Open Invite
                   </button>
+                </div>
+                <div className="mt-4 rounded-lg border border-slate-800 bg-[#101122] p-4">
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">
+                    Optional email-bound invite
+                  </p>
+                  <div className="flex flex-col gap-3 md:flex-row">
+                    <input
+                      type="email"
+                      value={inviteEmails[a.id] || ""}
+                      onChange={(e) =>
+                        setInviteEmails((current) => ({ ...current, [a.id]: e.target.value }))
+                      }
+                      placeholder="candidate@company.com"
+                      className="flex-1 rounded-lg px-4 py-2.5 bg-slate-800/50 border border-slate-700 text-white text-sm placeholder:text-slate-500 focus:outline-none focus:border-[#10B981] transition-colors"
+                    />
+                    <button
+                      onClick={() => handleQuickInvite(a.id, inviteEmails[a.id]?.trim() || undefined)}
+                      className="rounded-lg px-4 py-2.5 text-sm font-medium border border-slate-700 text-slate-300 hover:border-[#10B981]/50 hover:text-white transition-colors"
+                    >
+                      Copy Restricted Invite
+                    </button>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-2">
+                    Leave the email blank for an open link, or bind the invite to one candidate email.
+                  </p>
+                  {inviteStatus[a.id] && (
+                    <p className="text-xs text-[#10B981] mt-2">{inviteStatus[a.id]}</p>
+                  )}
                 </div>
               </div>
             ))}

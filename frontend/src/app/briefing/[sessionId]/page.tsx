@@ -5,12 +5,6 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuthToken } from "@/lib/useAuthToken";
 import { getScenarioDetails, getSessionStatus, type ScenarioDetail, type SessionStatus } from "@/lib/api";
 
-const AGENTS = [
-  { label: "Data Analyst", desc: "SQL queries, metrics, trends, funnel analysis", icon: "database", color: "bg-sky-500/15 text-sky-400" },
-  { label: "UX Researcher", desc: "User feedback, support tickets, usability studies", icon: "person_search", color: "bg-violet-500/15 text-violet-400" },
-  { label: "Engineering Lead", desc: "Deployments, error patterns, service health", icon: "terminal", color: "bg-amber-500/15 text-amber-400" },
-];
-
 function getCookie(name: string): string {
   if (typeof document === "undefined") return "";
   const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
@@ -20,6 +14,12 @@ function getCookie(name: string): string {
 function clearCookie(name: string) {
   document.cookie = `${name}=;path=/;max-age=0`;
 }
+
+const AGENTS = [
+  { label: "Data Analyst", desc: "SQL queries, metrics, trends, funnel analysis", icon: "database", color: "bg-sky-500/15 text-sky-400" },
+  { label: "UX Researcher", desc: "User feedback, support tickets, usability studies", icon: "person_search", color: "bg-violet-500/15 text-violet-400" },
+  { label: "Engineering Lead", desc: "Deployments, error patterns, service health", icon: "terminal", color: "bg-amber-500/15 text-amber-400" },
+];
 
 export default function BriefingPage() {
   const session = useAuthToken();

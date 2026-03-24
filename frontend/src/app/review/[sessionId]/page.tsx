@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useAuthToken } from "@/lib/useAuthToken";
 import {
+  getMe,
+  getMySessions,
   getSavedEvidence,
   getScoringResult,
   triggerScoring,
@@ -12,6 +14,7 @@ import {
   type SavedEvidence,
   type ScoringResult,
 } from "@/lib/api";
+import { findAssignedSession } from "@/lib/auth-routing";
 
 const DIMENSION_LABELS: Record<string, string> = {
   root_cause_identification: "Root Cause Identification",
@@ -226,8 +229,9 @@ function ReviewArtifactView({ artifact }: { artifact: Artifact }) {
 }
 
 export default function ReviewPage() {
+  const router = useRouter();
   const params = useParams();
-  useAuthToken();
+  const session = useAuthToken();
   const sessionId = params.sessionId as string;
 
   const [scoring, setScoring] = useState<ScoringResult | null>(null);
@@ -235,6 +239,37 @@ export default function ReviewPage() {
   const [loading, setLoading] = useState(true);
   const [scoring_loading, setScoringLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!session) return;
+
+    let cancelled = false;
+
+    async function validateRole() {
+      try {
+        const me = await getMe();
+        if (cancelled) return;
+
+        if (me.role === "company") return;
+
+        const { sessions } = await getMySessions();
+        if (cancelled) return;
+
+        const assignedSession = findAssignedSession(sessions);
+        router.replace(assignedSession ? `/briefing/${assignedSession.session_id}` : "/candidate");
+      } catch {
+        if (!cancelled) {
+          router.replace("/login?role=company");
+        }
+      }
+    }
+
+    validateRole();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session, router]);
 
   useEffect(() => {
     async function load() {

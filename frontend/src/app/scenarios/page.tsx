@@ -1,10 +1,12 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { useAuthToken } from "@/lib/useAuthToken";
 import {
+  getMe,
   getMySessions,
   listScenarios,
   getChallenges,
@@ -33,6 +35,14 @@ export default function ScenariosPage() {
     let cancelled = false;
 
     async function loadScenarios() {
+      const me = await getMe();
+      if (cancelled) return;
+
+      if (me.role === "company") {
+        router.replace("/dashboard");
+        return;
+      }
+
       const { sessions } = await getMySessions();
       if (cancelled) return;
 
@@ -117,10 +127,13 @@ export default function ScenariosPage() {
             {authSession?.user && (
               <div className="flex items-center gap-3">
                 {authSession.user.image && (
-                  <img
+                  <Image
                     src={authSession.user.image}
                     alt=""
                     className="size-8 rounded-full"
+                    width={32}
+                    height={32}
+                    unoptimized
                     referrerPolicy="no-referrer"
                   />
                 )}
@@ -128,7 +141,7 @@ export default function ScenariosPage() {
                   {authSession.user.name}
                 </span>
                 <button
-                  onClick={() => signOut({ callbackUrl: "/login" })}
+                  onClick={() => signOut({ callbackUrl: "/" })}
                   className="flex items-center justify-center rounded-lg h-9 px-4 bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-medium hover:opacity-80 transition-opacity"
                 >
                   Sign out

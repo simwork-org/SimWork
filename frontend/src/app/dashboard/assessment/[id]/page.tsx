@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -10,8 +11,10 @@ import {
   getAssessmentDetail,
   generateInvite,
   getMe,
+  getMySessions,
 } from "@/lib/api";
 import { useAuthToken } from "@/lib/useAuthToken";
+import { findAssignedSession } from "@/lib/auth-routing";
 
 export default function AssessmentDetailPage() {
   const session = useAuthToken();
@@ -23,6 +26,7 @@ export default function AssessmentDetailPage() {
   const [invites, setInvites] = useState<InviteInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [copiedLink, setCopiedLink] = useState("");
+  const [candidateEmail, setCandidateEmail] = useState("");
 
   useEffect(() => {
     if (!session || !id) return;
@@ -31,7 +35,9 @@ export default function AssessmentDetailPage() {
       try {
         const me = await getMe();
         if (me.role !== "company") {
-          router.replace("/");
+          const { sessions } = await getMySessions();
+          const assignedSession = findAssignedSession(sessions);
+          router.replace(assignedSession ? `/briefing/${assignedSession.session_id}` : "/candidate");
           return;
         }
         const data = await getAssessmentDetail(id);
@@ -48,11 +54,12 @@ export default function AssessmentDetailPage() {
     load();
   }, [session, id, router]);
 
-  const handleGenerateInvite = async () => {
-    const { invite_url } = await generateInvite(id);
+  const handleGenerateInvite = async (email?: string) => {
+    const { invite_url } = await generateInvite(id, email);
     const fullUrl = `${window.location.origin}${invite_url}`;
     await navigator.clipboard.writeText(fullUrl);
     setCopiedLink(fullUrl);
+    if (email) setCandidateEmail("");
     // Refresh invites
     const data = await getAssessmentDetail(id);
     setInvites(data.invites);
@@ -102,12 +109,36 @@ export default function AssessmentDetailPage() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold">Invite Links</h2>
             <button
-              onClick={handleGenerateInvite}
+              onClick={() => handleGenerateInvite()}
               className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium bg-[#10B981] hover:bg-emerald-600 transition-colors"
             >
               <span className="material-symbols-outlined text-base">add_link</span>
               Generate New Link
             </button>
+          </div>
+
+          <div className="rounded-xl border border-slate-800 bg-slate-900/20 p-4 mb-4">
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">
+              Optional email restriction
+            </p>
+            <div className="flex flex-col gap-3 md:flex-row">
+              <input
+                type="email"
+                value={candidateEmail}
+                onChange={(e) => setCandidateEmail(e.target.value)}
+                placeholder="candidate@company.com"
+                className="flex-1 rounded-lg px-4 py-2.5 bg-slate-800/50 border border-slate-700 text-white text-sm placeholder:text-slate-500 focus:outline-none focus:border-[#10B981] transition-colors"
+              />
+              <button
+                onClick={() => handleGenerateInvite(candidateEmail.trim() || undefined)}
+                className="rounded-lg px-4 py-2.5 text-sm font-medium border border-slate-700 text-slate-300 hover:border-[#10B981]/50 hover:text-white transition-colors"
+              >
+                Copy Restricted Invite
+              </button>
+            </div>
+            <p className="text-xs text-slate-500 mt-2">
+              Restricted invites can only be claimed by the candidate with that exact email address.
+            </p>
           </div>
 
           {copiedLink && (
@@ -129,6 +160,11 @@ export default function AssessmentDetailPage() {
                   <div className="flex items-center gap-3">
                     <span className="material-symbols-outlined text-base text-slate-500">link</span>
                     <code className="text-xs text-slate-400 font-mono">/invite/{inv.token}</code>
+                    {inv.candidate_email && (
+                      <span className="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-300">
+                        {inv.candidate_email}
+                      </span>
+                    )}
                     {inv.used_at ? (
                       <span className="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400">
                         Claimed by {inv.claimed_by_name || inv.claimed_by_email}
@@ -175,7 +211,14 @@ export default function AssessmentDetailPage() {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           {c.picture && (
-                            <img src={c.picture} alt="" className="size-7 rounded-full" />
+                            <Image
+                              src={c.picture}
+                              alt=""
+                              className="size-7 rounded-full"
+                              width={28}
+                              height={28}
+                              unoptimized
+                            />
                           )}
                           <div>
                             <p className="text-white font-medium">{c.name || "Unknown"}</p>

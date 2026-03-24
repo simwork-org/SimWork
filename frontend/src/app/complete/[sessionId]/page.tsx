@@ -314,11 +314,11 @@ export default function CompletionPage() {
 
           <div className="mt-8 flex justify-center">
             <button
-              onClick={() => router.push("/scenarios")}
+              onClick={() => router.push("/candidate")}
               className="flex items-center gap-2 text-slate-500 dark:text-slate-400 hover:text-[#10B981] dark:hover:text-[#10B981] transition-colors font-medium"
             >
               <span className="material-symbols-outlined">arrow_back</span>
-              Back to Dashboard
+              Back to assessments
             </button>
           </div>
         </div>

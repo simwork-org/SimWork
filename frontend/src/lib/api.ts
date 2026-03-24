@@ -1,3 +1,5 @@
+import { buildLandingAuthUrl, inferCompanyIntent } from "@/lib/auth-routing";
+
 function normalizeApiBase(url: string): string {
   const trimmed = url.trim().replace(/\/+$/, "");
   if (trimmed.endsWith("/api/v1")) {
@@ -31,7 +33,13 @@ async function fetchJSON<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(`Cannot reach backend at ${API_BASE}${path}: ${message}`);
   }
   if (res.status === 401 && typeof window !== "undefined") {
-    window.location.href = "/login";
+    const nextPath = `${window.location.pathname}${window.location.search}`;
+    if (window.location.pathname !== "/") {
+      window.location.href = buildLandingAuthUrl({
+        auth: inferCompanyIntent(nextPath) ? "company" : "candidate",
+        next: nextPath,
+      });
+    }
     throw new Error("Session expired");
   }
   if (!res.ok) {

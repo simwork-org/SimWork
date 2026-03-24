@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { InviteValidation } from "@/lib/api";
+import { setPendingAuthState } from "@/lib/auth-routing";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -29,7 +30,7 @@ export default function InvitePage() {
   }, [token]);
 
   const handleSignIn = () => {
-    document.cookie = `simwork_invite=${token};path=/;max-age=600`;
+    setPendingAuthState({ invite: token });
     signIn("google", { callbackUrl: "/auth/redirect" });
   };
 
