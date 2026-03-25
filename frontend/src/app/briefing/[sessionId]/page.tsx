@@ -43,6 +43,10 @@ export default function BriefingPage() {
       getSessionStatus(sessionId),
     ])
       .then(([scenarioData, statusData]) => {
+        if (statusData.status === "completed") {
+          router.replace("/candidate");
+          return;
+        }
         setScenario(scenarioData);
         setStatus(statusData);
       })

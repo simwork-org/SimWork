@@ -317,6 +317,7 @@ def get_session_status(session_id: str) -> dict[str, Any]:
     return {
         "session_id": session_id,
         "scenario_id": session["scenario_id"],
+        "status": session.get("status", "active"),
         "time_remaining_minutes": round(time_remaining, 1),
         "queries_made": get_queries_count(session_id),
         "saved_evidence_count": len(get_saved_evidence(session_id)),

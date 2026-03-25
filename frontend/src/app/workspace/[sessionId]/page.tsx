@@ -1524,7 +1524,13 @@ export default function WorkspacePage() {
   }, []);
 
   useEffect(() => {
-    getSessionStatus(sessionId).then(setStatus).catch(console.error);
+    getSessionStatus(sessionId).then((data) => {
+      if (data.status === "completed") {
+        router.replace("/candidate");
+        return;
+      }
+      setStatus(data);
+    }).catch(console.error);
     getScenarioDetails(sessionId).then(setScenarioDetail).catch(console.error);
     getQueryHistory(sessionId).then((data) => {
       const nextMessages: ChatMessage[] = [];

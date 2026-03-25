@@ -168,12 +168,18 @@ export default function CandidateHomePage() {
                           Started {new Date(session.started_at).toLocaleString()}
                         </p>
                       </div>
-                      <Link
-                        href={`/briefing/${session.session_id}`}
-                        className="inline-flex items-center justify-center rounded-lg px-4 py-2.5 bg-[#10B981] text-sm font-bold text-white hover:bg-emerald-600 transition-colors"
-                      >
-                        Continue
-                      </Link>
+                      {session.status === "completed" ? (
+                        <span className="inline-flex items-center justify-center rounded-lg px-4 py-2.5 bg-slate-700 text-sm font-bold text-slate-300 cursor-default">
+                          Completed
+                        </span>
+                      ) : (
+                        <Link
+                          href={`/briefing/${session.session_id}`}
+                          className="inline-flex items-center justify-center rounded-lg px-4 py-2.5 bg-[#10B981] text-sm font-bold text-white hover:bg-emerald-600 transition-colors"
+                        >
+                          Continue
+                        </Link>
+                      )}
                     </div>
                   </div>
                 ))}

@@ -130,10 +130,5 @@ export function resolveAuthenticatedDestination(
 
   if (safeNext && isCandidateRoute(safeNext)) return safeNext;
 
-  const assignedSession = findAssignedSession(sessions);
-  if (assignedSession) {
-    return `/briefing/${assignedSession.session_id}`;
-  }
-
   return "/candidate";
 }

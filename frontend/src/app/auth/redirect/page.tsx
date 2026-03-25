@@ -2,11 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { claimInvite, getMe, getMySessions, setMyRole } from "@/lib/api";
+import { claimInvite, getMe, setMyRole } from "@/lib/api";
 import { useAuthToken } from "@/lib/useAuthToken";
 import {
   clearPendingAuthState,
-  findAssignedSession,
   readPendingAuthState,
   resolveAuthenticatedDestination,
   setCookie,
@@ -52,12 +51,7 @@ export default function AuthRedirectPage() {
           }
           router.replace(resolveAuthenticatedDestination(me.role, [], next));
         } else {
-          const { sessions } = await getMySessions();
-          const assignedSession = findAssignedSession(sessions);
-          if (assignedSession?.company_name) {
-            setCookie("simwork_company", assignedSession.company_name);
-          }
-          router.replace(resolveAuthenticatedDestination(me.role, sessions, next));
+          router.replace(resolveAuthenticatedDestination(me.role, [], next));
         }
       } catch {
         router.replace("/?auth=candidate");

@@ -205,6 +205,7 @@ export interface ScenarioDetail {
 export interface SessionStatus {
   session_id: string;
   scenario_id: string;
+  status: string;
   time_remaining_minutes: number;
   queries_made: number;
   saved_evidence_count: number;
@@ -224,7 +225,7 @@ interface QueryResponse {
 
 export interface ProposedAction {
   action: string;
-  priority: "P0" | "P1" | "P2";
+  priority: string;
 }
 
 export interface SessionSubmission {

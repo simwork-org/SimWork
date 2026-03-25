@@ -84,14 +84,14 @@ class UpdateEvidenceAnnotationRequest(BaseModel):
 
 class ProposedActionRequest(BaseModel):
     action: str
-    priority: Literal["P0", "P1", "P2"]
+    priority: str
 
 
 class SubmitRequest(BaseModel):
     root_cause: str
-    supporting_evidence_ids: list[int]
+    supporting_evidence_ids: list[int] = []
     proposed_actions: list[ProposedActionRequest]
-    stakeholder_summary: str
+    stakeholder_summary: str = ""
 
 
 @router.post("/sessions/start")
