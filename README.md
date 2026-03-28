@@ -18,7 +18,7 @@ scenarios/          Scenario data and configuration
 docs/releases/      Versioned release notes
 CHANGELOG.md        Durable change history
 RELEASING.md        Release process
-.local/docs/        Ignored local planning, research, and reference material
+local/              Ignored local planning, research, and reference material
 ```
 
 ## Documentation Policy
@@ -27,7 +27,7 @@ RELEASING.md        Release process
 - `CHANGELOG.md` is the canonical version history.
 - `RELEASING.md` defines the release process.
 - `docs/releases/` contains one release note per shipped version.
-- `.local/docs/` is for local-only planning, research, PRDs, notes, and reference files that should not be committed.
+- `local/` is for local-only planning, research, PRDs, notes, and reference files that should not be committed.
 
 ## Local Setup
 

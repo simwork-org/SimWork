@@ -16,21 +16,19 @@
       "challenge_title": "The Order Drop",
       "challenge_prompt": "Completed orders have dropped across key Indian metros since mid-January. Competitors are holding steady. Find what's causing the decline and propose a recovery plan.",
       "challenge_problem_statement": "ZaikaNow, an India-native food delivery marketplace, has seen a significant drop in completed orders starting mid-January across Bengaluru, Mumbai, and Delhi NCR. Leadership is concerned — major competitors aren't showing the same decline. Your job is to investigate the root cause using data from analytics, engineering, and user research, then propose an actionable recovery plan.",
-      "root_cause": "The RupeeFlow v3 payment migration on January 10, 2025 degraded UPI confirmation and callback handling. Android users in high-volume metros were hit hardest, causing payment failures, delayed confirmations, and order completion drops. A Feb 1 hotfix partially restored reliability, but trust damage persists among power and returning users who reduced ordering frequency.",
+      "root_cause": "The RupeeFlow v3 payment migration (DEP004) on January 10, 2025 broke UPI callback confirmation handling and degraded overall payment processing. UPI users were hit hardest (29-point success rate drop vs ~15 for other methods). Since UPI represents 60%+ of transactions, this caused a ~40% drop in completed orders. A Feb 1 hotfix partially restored reliability, but trust damage persists — order volumes remain 25-30% below baseline.",
       "key_evidence": [
-        "Funnel break at payment_attempt to order_complete starting Jan 10",
-        "UPI is the most affected payment method; Android + primary metros worst segment",
-        "DEP004: Migrated to RupeeFlow v3 on Jan 10",
-        "Payment service p99 latency spikes from 490ms to 2685ms on Jan 10",
-        "Error codes shift to UPI_CALLBACK_TIMEOUT, BANK_TIMEOUT, PAYMENT_PROVIDER_ERROR",
-        "Support tickets dominated by upi_timeout and callback_delay categories",
-        "Usability study: task completion dropped from 93% to 61%",
-        "Post-hotfix (Feb 1): technical metrics improve but order volumes remain depressed",
-        "Reviews show trust damage: users ordering less, shifting to competitors",
-        "Platform mix shifts: Android share drops, web share rises"
+        "Daily completed orders drop ~40% on Jan 10 — sharp break unrelated to Christmas promo ending Dec 26",
+        "Funnel break is at payment_attempt → order_complete; traffic and cart adds are UP",
+        "UPI success rate drops 29 points (82% → 53%); other methods drop ~15 points",
+        "DEP004: RupeeFlow v3 migration deployed Jan 10 at 06:00",
+        "Payment service p99 latency spikes 5x (495ms → 2,421ms); error rate jumps 8x",
+        "Top 5 error codes include 3 UPI-specific: UPI_CALLBACK_TIMEOUT, UPI_COLLECT_PENDING, TRANSACTION_REVERSED",
+        "Usability study: task completion dropped from 93% to 61%; users report money debited without confirmation",
+        "Post-hotfix (Feb 1): orders improve but remain 25-30% below baseline — trust damage persists"
       ],
       "red_herrings_to_reject": [
-        "New Year promo normalization (resolves by Jan 7, 3-day gap before payment failures start Jan 10)",
+        "Christmas promo normalization (resolves by Dec 28, 13-day gap before payment failures start Jan 10)",
         "Search service p99 spike (Jan 8, resolves immediately, unrelated to checkout)",
         "Republic Day promo (late Jan, merchandizing not payments)",
         "Notification service errors (Jan 20-22, communication channel, not payment flow)",
@@ -152,38 +150,37 @@
   "expected_investigation_path": [
     "orders_trend_analysis",
     "checkout_funnel_breakdown",
-    "city_platform_segment_analysis",
     "payment_method_review",
     "deployment_timeline_review",
     "payment_service_latency_check",
+    "error_pattern_analysis",
     "user_feedback_validation",
-    "cohort_retention_analysis",
-    "trust_damage_assessment"
+    "post_hotfix_recovery_check"
   ],
   "expected_key_findings": [
-    "A sharp drop in completed orders begins Jan 10 affecting the payment step specifically",
-    "The largest funnel break occurs from payment attempt to order completion",
-    "Android users in Bengaluru, Mumbai, and Delhi NCR show the sharpest degradation",
-    "UPI is the most affected payment method and the main driver of failed confirmations",
-    "RupeeFlow v3 migration (DEP004) on January 10 aligns with the reliability decline",
-    "Payment service p99 latency spikes from 490ms to 2685ms after the migration",
-    "Payment error mix shifts toward UPI_CALLBACK_TIMEOUT, BANK_TIMEOUT, and PAYMENT_PROVIDER_ERROR",
-    "Support tickets and reviews confirm user-facing impact: UPI timeouts, money debited without confirmation",
-    "Feb 1 hotfix improves technical metrics but order frequency remains depressed",
-    "Power and returning users on Android show elevated cancellation and reduced ordering — trust damage persists"
+    "A sharp drop in completed orders (~40%) begins Jan 10 — not related to Christmas promo ending Dec 26",
+    "The funnel break is specifically at payment_attempt → order_complete; top-of-funnel traffic is UP",
+    "UPI is the most affected payment method — 29-point success rate drop (82% → 53%) vs ~15 points for others",
+    "UPI represents 60%+ of transactions, making it the primary driver of the order drop",
+    "RupeeFlow v3 migration (DEP004) deployed Jan 10 at 06:00 aligns exactly with the degradation",
+    "Payment service p99 latency spikes 5x (495ms → 2,421ms) on Jan 10; error rate jumps 8x",
+    "Top error codes are UPI-specific: UPI_CALLBACK_TIMEOUT, UPI_COLLECT_PENDING, TRANSACTION_REVERSED",
+    "Usability study confirms user-facing impact: task completion dropped 93% → 61%",
+    "Feb 1 hotfix partially recovers orders but volumes remain 25-30% below baseline",
+    "Trust damage persists — users who experienced failures order less or switched to competitors"
   ],
   "red_herrings": [
     {
-      "signal": "New Year campaign caused a visible demand spike from late December into early January",
-      "why_misleading": "Traffic normalization after the campaign is real, but it resolves by Jan 7 and does not explain the payment-step degradation that starts on January 10."
+      "signal": "Christmas campaign caused a visible demand spike from December 20-26",
+      "why_misleading": "Traffic normalization after the campaign resolves by Dec 28, a full two weeks before the payment-step degradation that starts on January 10."
     },
     {
       "signal": "Search service p99 latency spikes on January 8",
       "why_misleading": "The spike is brief, resolves quickly, and does not line up with the checkout failure pattern."
     },
     {
-      "signal": "Republic Day promo and homepage rail changes launch in late January",
-      "why_misleading": "They can distract toward merchandizing explanations, but the reliability break is in payments."
+      "signal": "Republic Day homepage banner launches in late January",
+      "why_misleading": "A merchandising change, not a technical one — the reliability break is in payments, not discovery."
     },
     {
       "signal": "Notification service errors rise briefly on January 20-22",
@@ -198,7 +195,7 @@
     "root_cause_identification": {
       "weight": 0.35,
       "levels": {
-        "excellent": "Identifies the RupeeFlow v3 migration as the root cause, explains the UPI confirmation regression, links it to Android-heavy metro impact, and recognizes that trust damage persists after the hotfix",
+        "excellent": "Identifies the RupeeFlow v3 migration as the root cause, explains UPI as the primary affected method (29-point drop), and recognizes that trust damage persists after the hotfix",
         "good": "Identifies the payment gateway issue and the UPI/city pattern, but may not fully explain the post-fix trust damage",
         "adequate": "Identifies the payment step as the main problem but does not isolate the migration or affected segment cleanly",
         "poor": "Blames weaker factors such as promos ending, search ranking, or general traffic decline"

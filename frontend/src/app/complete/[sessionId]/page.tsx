@@ -5,13 +5,14 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuthToken } from "@/lib/useAuthToken";
 import {
   getSavedEvidence,
+  getSessionStatus,
   logSessionEvent,
   submitSolution,
   type ProposedAction,
   type SavedEvidence,
 } from "@/lib/api";
 
-const PRIORITIES: ProposedAction["priority"][] = ["P0", "P1", "P2"];
+// Priorities are generated dynamically based on action count
 
 function formatCell(value: string | number | null | undefined) {
   if (value === null || value === undefined || value === "") return "—";
@@ -83,18 +84,22 @@ export default function CompletionPage() {
   const [rootCause, setRootCause] = useState("");
   const [proposedActions, setProposedActions] = useState<ProposedAction[]>([
     { action: "", priority: "P0" },
-    { action: "", priority: "P1" },
-    { action: "", priority: "P2" },
   ]);
   const [stakeholderSummary, setStakeholderSummary] = useState("");
   const [savedEvidence, setSavedEvidence] = useState<SavedEvidence[]>([]);
   const [selectedEvidenceIds, setSelectedEvidenceIds] = useState<number[]>([]);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [timeExpired, setTimeExpired] = useState(false);
 
   useEffect(() => {
     logSessionEvent(sessionId, "submission_started", {}).catch(() => undefined);
     getSavedEvidence(sessionId).then((data) => setSavedEvidence(data.evidence)).catch(console.error);
+    getSessionStatus(sessionId).then((data) => {
+      if (data.time_remaining_minutes <= 0) {
+        setTimeExpired(true);
+      }
+    }).catch(() => {});
   }, [sessionId]);
 
   const validActions = useMemo(
@@ -102,7 +107,7 @@ export default function CompletionPage() {
     [proposedActions]
   );
 
-  const canSubmit = rootCause.trim().length > 0 && stakeholderSummary.trim().length > 0 && validActions.length > 0 && selectedEvidenceIds.length > 0;
+  const canSubmit = rootCause.trim().length > 0 && validActions.length > 0;
 
   const toggleEvidence = async (savedEvidenceId: number) => {
     const willSelect = !selectedEvidenceIds.includes(savedEvidenceId);
@@ -139,12 +144,14 @@ export default function CompletionPage() {
             </div>
             <h2 className="text-slate-900 dark:text-slate-100 text-lg font-bold tracking-tight">SimWork</h2>
           </div>
-          <button
-            onClick={() => router.push(`/workspace/${sessionId}`)}
-            className="rounded-lg h-10 px-4 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm font-semibold"
-          >
-            Back to Investigation
-          </button>
+          {!timeExpired && (
+            <button
+              onClick={() => router.push(`/workspace/${sessionId}`)}
+              className="rounded-lg h-10 px-4 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm font-semibold"
+            >
+              Back to Investigation
+            </button>
+          )}
         </header>
 
         <main className="flex flex-1 overflow-hidden">
@@ -160,7 +167,7 @@ export default function CompletionPage() {
               <div className="bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl p-6 space-y-6">
                 <div>
                   <label className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 block">
-                    What is the root cause of the conversion drop?
+                    What is the root cause of the conversion drop? <span className="text-red-500">*</span>
                   </label>
                   <input
                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-[#10B981] outline-none"
@@ -172,9 +179,9 @@ export default function CompletionPage() {
 
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Proposed Actions</label>
+                    <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Proposed Actions <span className="text-red-500">*</span></label>
                     <button
-                      onClick={() => setProposedActions((prev) => [...prev, { action: "", priority: "P1" }])}
+                      onClick={() => setProposedActions((prev) => [...prev, { action: "", priority: `P${prev.length}` }])}
                       className="text-xs px-2.5 py-1 rounded-full border border-slate-300 dark:border-slate-700 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
                     >
                       Add action
@@ -190,7 +197,7 @@ export default function CompletionPage() {
                           }
                           className="w-24 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-3 text-sm"
                         >
-                          {PRIORITIES.map((priority) => (
+                          {Array.from({ length: proposedActions.length }, (_, i) => `P${i}`).map((priority) => (
                             <option key={priority} value={priority}>{priority}</option>
                           ))}
                         </select>
@@ -209,11 +216,11 @@ export default function CompletionPage() {
 
                 <div>
                   <label className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 block">
-                    Brief this to your VP of Product
+                    Additional Comments
                   </label>
                   <textarea
                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-[#10B981] outline-none min-h-[120px]"
-                    placeholder="Write a concise 2-3 sentence stakeholder summary."
+                    placeholder="Any additional context or comments (optional)"
                     value={stakeholderSummary}
                     maxLength={500}
                     onChange={(event) => setStakeholderSummary(event.target.value)}
@@ -314,11 +321,11 @@ export default function CompletionPage() {
 
           <div className="mt-8 flex justify-center">
             <button
-              onClick={() => router.push("/")}
+              onClick={() => router.push("/candidate")}
               className="flex items-center gap-2 text-slate-500 dark:text-slate-400 hover:text-[#10B981] dark:hover:text-[#10B981] transition-colors font-medium"
             >
               <span className="material-symbols-outlined">arrow_back</span>
-              Back to Dashboard
+              Back to assessments
             </button>
           </div>
         </div>

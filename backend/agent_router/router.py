@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 import uuid
 from typing import Any, Callable
 
@@ -33,7 +34,7 @@ PLAN_SCHEMA = {
     "question_understanding": "Short summary of the user's ask",
     "complexity": "single_query | multi_step",
     "sub_questions": ["Optional sub-question"],
-    "target_tables": ["Allowed source name such as orders"],
+    "target_tables": ["Allowed source name from the provided metadata"],
     "stop_condition": "What evidence is enough to answer",
     "next_steps": ["Follow-up the user might ask next"],
     "needs_clarification": False,
@@ -56,6 +57,18 @@ ACTION_SCHEMA = {
     "document_terms": ["Optional search terms for document excerpts"],
     "title": "Human-friendly title for the resulting evidence",
     "answer_mode": "metric | chart | table | text",
+    "chart_type": (
+        "Optional when answer_mode=chart. Choose the most appropriate type: "
+        "bar (categorical comparisons, rankings, top-N), "
+        "line (trends over time, continuous data), "
+        "funnel (sequential steps with drop-off), "
+        "pie (proportions/share of total, max 8 slices), "
+        "scatter (correlation between two numeric variables), "
+        "heatmap (matrix of values, cross-tabs, cohort grids), "
+        "histogram (distribution of a single numeric variable), "
+        "box (statistical spread: min/Q1/median/Q3/max), "
+        "dual_axis_line (two metrics with very different scales on same time axis)"
+    ),
 }
 
 
@@ -93,8 +106,10 @@ def route_query(
     effective_query = clarification_resolution["effective_query"] or query
     clarification_history = clarification_resolution["clarification_history"]
 
+    _route_start_ms = time.monotonic()
+    all_llm_calls: list[dict[str, Any]] = []
     _emit("planning", "Understanding your question and planning investigation...")
-    plan, plan_warning = _plan_investigation(
+    plan, plan_warning, planner_llm_call = _plan_investigation(
         llm=llm,
         agent=agent,
         role=role,
@@ -105,6 +120,8 @@ def route_query(
         clarification_state=clarification_state,
         clarification_resolution=clarification_resolution,
     )
+    if planner_llm_call:
+        all_llm_calls.append(planner_llm_call)
     plan = _finalize_plan_clarification_state(
         plan=plan,
         original_query=original_query,
@@ -138,10 +155,11 @@ def route_query(
             "intent_class": "investigation",
             "_planner": plan,
             "_attempts": [],
+            "_llm_calls": all_llm_calls,
         }
 
     _emit("investigating", "Starting data investigation...")
-    evidence, attempts, warnings = _run_investigation_loop(
+    evidence, attempts, warnings, loop_llm_calls = _run_investigation_loop(
         llm=llm,
         scenario_id=scenario_id,
         agent=agent,
@@ -158,9 +176,11 @@ def route_query(
     if clarification_resolution.get("note"):
         warnings.append(clarification_resolution["note"])
 
+    all_llm_calls.extend(loop_llm_calls)
     _emit("synthesizing", "Composing final answer...")
-    artifacts, citations = _build_artifacts_and_citations(evidence, agent)
-    response = _synthesize_response(
+    artifacts, citations, artifact_llm_calls = _build_artifacts_and_citations(evidence, agent, user_query=original_query, llm=llm)
+    all_llm_calls.extend(artifact_llm_calls)
+    response, synth_llm_call = _synthesize_response(
         llm=llm,
         agent=agent,
         role=role,
@@ -171,6 +191,23 @@ def route_query(
         conversation_context=conversation_context,
     )
 
+    if synth_llm_call:
+        all_llm_calls.append(synth_llm_call)
+
+    total_duration_ms = round((time.monotonic() - _route_start_ms) * 1000)
+    trace = {
+        "intent": query,
+        "question_understanding": plan.get("question_understanding", ""),
+        "sub_questions": plan.get("sub_questions", []),
+        "effective_query": effective_query if effective_query != query else None,
+        "conversation_turns": len(history),
+        "clarification_asked": clarification_resolution.get("latest_reply"),
+        "clarification_resolved": bool(clarification_resolution.get("effective_query")),
+        "plan_complexity": plan.get("complexity", "single_query"),
+        "total_attempts": len(attempts),
+        "evidence_collected": len(evidence),
+        "total_duration_ms": total_duration_ms,
+    }
     return {
         "agent": agent,
         "response": response,
@@ -182,6 +219,8 @@ def route_query(
         "intent_class": "investigation",
         "_planner": {**plan, "conversation_context_summary": conversation_context, "attempt_count": len(attempts)},
         "_attempts": attempts,
+        "_trace": trace,
+        "_llm_calls": all_llm_calls,
     }
 
 
@@ -195,7 +234,7 @@ def _plan_investigation(
     conversation_context: list[dict[str, Any]],
     clarification_state: dict[str, Any],
     clarification_resolution: dict[str, Any],
-) -> tuple[dict[str, Any], str | None]:
+) -> tuple[dict[str, Any], str | None, dict[str, Any]]:
     system = _role_system_prompt(agent, role) + (
         "\n\nCreate a short investigation plan before querying data. "
         "Decide whether the question looks solvable with one query or needs multiple steps. "
@@ -208,11 +247,13 @@ def _plan_investigation(
         "previous query — combine the prior context with the current request to form a complete plan. "
         "Do not ask for clarification when the conversation history provides sufficient context. "
         "Ask a clarifying question only when the ambiguity materially changes the SQL plan or answer semantics. "
+        "When the user asks about categories or stages from a table, check the distinct_value_previews in the metadata "
+        "to see all available values. Default to including ALL values rather than guessing a subset. "
         "Ask one clarifying question at a time, prefer 2-3 suggested answers for common ambiguities, "
         "always allow free-text clarification, and do not ask more questions if the clarification budget is exhausted. "
         "Return JSON only."
     )
-    plan, error = _chat_json(
+    plan, error, llm_call = _chat_json_traced(
         llm=llm,
         system=system,
         payload={
@@ -233,8 +274,8 @@ def _plan_investigation(
         purpose="planner",
     )
     if plan is not None:
-        return plan, None
-    return _generic_plan(source_metadata), f"Planner could not produce valid structured output: {error}"
+        return plan, None, llm_call
+    return _generic_plan(source_metadata), f"Planner could not produce valid structured output: {error}", llm_call
 
 
 def _run_investigation_loop(
@@ -247,10 +288,11 @@ def _run_investigation_loop(
     source_metadata: list[dict[str, Any]],
     conversation_context: list[dict[str, Any]],
     status_callback: Callable[[dict[str, str]], None] | None = None,
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[str]]:
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[str], list[dict[str, Any]]]:
     warnings: list[str] = []
     attempts: list[dict[str, Any]] = []
     evidence: list[dict[str, Any]] = []
+    llm_calls: list[dict[str, Any]] = []
     allowed_sql_tables = set(role.get("allowed_tables", []))
 
     def _emit(stage: str, detail: str = "") -> None:
@@ -259,7 +301,7 @@ def _run_investigation_loop(
 
     for attempt_no in range(1, MAX_INVESTIGATION_ATTEMPTS + 1):
         _emit("choosing_action", f"Attempt {attempt_no}: selecting next action...")
-        action, action_warning = _choose_next_action(
+        action, action_warning, action_llm_call = _choose_next_action(
             llm=llm,
             agent=agent,
             role=role,
@@ -270,6 +312,9 @@ def _run_investigation_loop(
             attempts=attempts,
             evidence=evidence,
         )
+        if action_llm_call:
+            action_llm_call["step"] = attempt_no
+            llm_calls.append(action_llm_call)
         if action_warning:
             warnings.append(action_warning)
 
@@ -277,6 +322,7 @@ def _run_investigation_loop(
         if action_type == "finish":
             break
 
+        _step_start_ms = time.monotonic()
         if action_type == "document":
             _emit("searching_docs", f"Searching documents: {action.get('title', '')}")
             record = _execute_document_step(
@@ -301,14 +347,19 @@ def _run_investigation_loop(
             )
 
         record["attempt"] = attempt_no
+        record["duration_ms"] = round((time.monotonic() - _step_start_ms) * 1000)
+        record["rows_returned"] = len(record.get("rows") or [])
         attempts.append(record)
 
         if record["status"] == "success" and record.get("rows"):
             # Critic check — validate result quality before accepting
             _emit("critic_review", f"Checking query quality (attempt {attempt_no})...")
-            is_ok, rejection_reason, suggested_fix = _critic_check(
+            is_ok, rejection_reason, suggested_fix, critic_llm_call = _critic_check(
                 llm=llm, query=query, action=action, record=record, plan=plan
             )
+            if critic_llm_call:
+                critic_llm_call["step"] = attempt_no
+                llm_calls.append(critic_llm_call)
             # Always record critic feedback on the attempt record
             record["critic_ok"] = is_ok
             if rejection_reason:
@@ -329,6 +380,7 @@ def _run_investigation_loop(
                     "rows": record.get("rows", []),
                     "columns": record.get("columns", []),
                     "answer_mode": record.get("answer_mode", "table"),
+                    "chart_type": record.get("chart_type"),
                     "summary": _summarize_attempt(record),
                     "sources": record.get("sources", []),
                     "query": record.get("sql"),
@@ -349,7 +401,7 @@ def _run_investigation_loop(
 
     if not evidence and attempts:
         warnings.append("The agent could not find strong evidence within the allowed attempt limit.")
-    return evidence, attempts, warnings
+    return evidence, attempts, warnings, llm_calls
 
 
 def _choose_next_action(
@@ -362,19 +414,37 @@ def _choose_next_action(
     conversation_context: list[dict[str, Any]],
     attempts: list[dict[str, Any]],
     evidence: list[dict[str, Any]],
-) -> tuple[dict[str, Any], str | None]:
+) -> tuple[dict[str, Any], str | None, dict[str, Any] | None]:
     if attempts and evidence:
-        return {"action": "finish", "reason": "We already have evidence.", "title": "Final answer", "answer_mode": "text"}, None
+        return {"action": "finish", "reason": "We already have evidence.", "title": "Final answer", "answer_mode": "text"}, None, None
 
     system = _role_system_prompt(agent, role) + (
         "\n\nYou are in an investigation loop. "
         "Choose the next best step to answer the question. "
         "If the user mentioned a segment or category that might match a low-cardinality column, check metadata or run a small discovery query before asking for clarification. "
-        "For trend or time-series questions, use answer_mode=chart and query the full available date range unless the user explicitly asks for a narrower window. "
+        "For trend or time-series questions, query the full available date range unless the user explicitly asks for a narrower window. "
         "Do not add arbitrary recent-day limits to trend queries. "
+        "Set answer_mode=metric for single-value questions (total, first, max, which X). "
+        "For all other queries, answer_mode and chart_type are optional hints — "
+        "the visualization layer will automatically choose the best rendering based on the data shape and user intent. "
+        "When the user compares categories, segments, or time periods (e.g., 'A vs B', 'by region', 'month over month'), "
+        "prefer long-format SQL output with a label column, a category column, and a value column. "
+        "Example: SELECT step AS label, month AS category, rate AS value ... "
+        "This shape enables automatic pivoting into grouped charts. "
+        "Avoid wide-format output with one column per category (e.g., jan_rate, dec_rate) as it prevents chart rendering. "
         "For weekly aggregations in SQLite, always use strftime('%Y-%m-%d', date_col, 'weekday 0', '-6 days') "
         "to get the Monday (week start) date, and GROUP BY that expression. "
         "Do NOT use strftime('%W') or strftime('%Y-W%W') as these create duplicates at year boundaries. "
+        "For tables with a low-cardinality categorical column (check distinct_value_previews in metadata), "
+        "prefer simple GROUP BY queries that return ALL values of that column — do not filter to a subset "
+        "unless the user explicitly names specific values. "
+        "For funnel/stage/category breakdowns, return the category and the count — "
+        "the visualization layer handles ordering, drop-off, and formatting automatically. "
+        "Do NOT compute derived columns (drop-off counts, percentages) in SQL. "
+        "Avoid CTEs, UNION ALL, and ORDER BY CASE — a simple GROUP BY is sufficient. "
+        "For period comparison, use a CASE expression on a date/timestamp column to create a period label, "
+        "then GROUP BY category, period — this produces the long-format "
+        "that auto-pivots into grouped charts. "
         "Use action=python when the question requires transformations SQL cannot easily express: "
         "rolling averages, percentiles, percentage-of-total, complex pivots, multi-step reshaping. "
         "When using action=python, provide BOTH sql (to fetch raw data) and python_code (pandas transformation). "
@@ -384,7 +454,7 @@ def _choose_next_action(
         "If you already have enough evidence, return action=finish. "
         "Return JSON only."
     )
-    action, error = _chat_json(
+    action, error, llm_call = _chat_json_traced(
         llm=llm,
         system=system,
         payload={
@@ -397,11 +467,11 @@ def _choose_next_action(
             "response_schema": ACTION_SCHEMA,
         },
         normalize=lambda value: _normalize_action(value, plan, source_metadata),
-        purpose="action selector",
+        purpose="action_chooser",
     )
     if action is not None:
-        return action, None
-    return {"action": "finish", "reason": "No valid next step could be produced.", "title": "Final answer", "answer_mode": "text"}, f"Action selection failed: {error}"
+        return action, None, llm_call
+    return {"action": "finish", "reason": "No valid next step could be produced.", "title": "Final answer", "answer_mode": "text"}, f"Action selection failed: {error}", llm_call
 
 
 def _execute_sql_step(
@@ -421,7 +491,9 @@ def _execute_sql_step(
             "status": "error",
             "kind": "sql",
             "title": action.get("title") or "SQL attempt",
+            "reason": action.get("reason", ""),
             "answer_mode": action.get("answer_mode", "table"),
+            "chart_type": action.get("chart_type"),
             "sql": sql,
             "error": result["error"],
             "sources": result.get("referenced_tables", []),
@@ -433,7 +505,9 @@ def _execute_sql_step(
         "status": "success",
         "kind": "sql",
         "title": action.get("title") or "SQL result",
+        "reason": action.get("reason", ""),
         "answer_mode": action.get("answer_mode", "table"),
+        "chart_type": action.get("chart_type"),
         "sql": result["executed_sql"],
         "sources": result.get("referenced_tables", []),
         "columns": result["columns"],
@@ -465,7 +539,9 @@ def _execute_python_step(
             "status": "error",
             "kind": "python",
             "title": action.get("title") or "Python attempt",
+            "reason": action.get("reason", ""),
             "answer_mode": action.get("answer_mode", "table"),
+            "chart_type": action.get("chart_type"),
             "sql": sql,
             "python_code": python_code,
             "error": f"SQL step failed: {sql_result['error']}",
@@ -487,7 +563,9 @@ def _execute_python_step(
             "status": "error",
             "kind": "python",
             "title": action.get("title") or "Python attempt",
+            "reason": action.get("reason", ""),
             "answer_mode": action.get("answer_mode", "table"),
+            "chart_type": action.get("chart_type"),
             "sql": sql,
             "python_code": python_code,
             "error": f"Pandas step failed: {sandbox_result['error']}",
@@ -501,7 +579,9 @@ def _execute_python_step(
         "status": "success",
         "kind": "python",
         "title": action.get("title") or "Python result",
+        "reason": action.get("reason", ""),
         "answer_mode": action.get("answer_mode", "table"),
+        "chart_type": action.get("chart_type"),
         "sql": sql,
         "python_code": python_code,
         "sources": sql_result.get("referenced_tables", []),
@@ -517,28 +597,34 @@ def _critic_check(
     action: dict[str, Any],
     record: dict[str, Any],
     plan: dict[str, Any],
-) -> tuple[bool, str | None, str | None]:
+) -> tuple[bool, str | None, str | None, dict[str, Any] | None]:
     """Review SQL/Python code for correctness before accepting results as evidence.
 
-    Returns (is_acceptable, rejection_reason, suggested_fix).
+    Returns (is_acceptable, rejection_reason, suggested_fix, llm_call_record).
     """
     columns = record.get("columns", [])
     sql = record.get("sql") or action.get("sql") or ""
 
     system = (
-        "You are a SQL/code quality reviewer. Given a user question and the SQL query "
-        "(and optional Python/pandas code) that was generated to answer it, determine if "
-        "the code is logically correct.\n\n"
-        "Only reject if there is a CLEAR, SPECIFIC error such as:\n"
-        "- Syntax errors in SQL or Python code\n"
-        "- Wrong GROUP BY granularity (e.g., daily when weekly was asked, or vice versa)\n"
-        "- Missing or incorrect JOIN conditions that would produce wrong results\n"
+        "You are a SQL/code correctness checker. Your ONLY job is to catch things that will "
+        "produce WRONG NUMBERS. You are NOT a methodology reviewer.\n\n"
+        "REJECT only for:\n"
+        "- SQL syntax errors that would cause execution failure\n"
+        "- Wrong JOIN conditions (missing ON clause, joining on wrong columns)\n"
+        "- Wrong aggregation function (SUM instead of COUNT, AVG instead of SUM)\n"
         "- Filters that exclude data the user explicitly asked about\n"
-        "- Week grouping using strftime('%W') or '%Y-W%W' instead of week-start dates\n"
-        "- Aggregation errors (e.g., SUM when COUNT was needed)\n\n"
-        "Do NOT reject for stylistic preferences, minor optimizations, or speculative issues.\n"
-        "When in doubt, mark it acceptable. The bar for rejection should be high — "
-        "only reject when the query will produce WRONG results for the user's question.\n\n"
+        "- GROUP BY that changes the granularity the user asked for (daily vs weekly)\n"
+        "- Week grouping using strftime('%W') or '%Y-W%W' instead of week-start dates\n\n"
+        "ACCEPT — do NOT reject for:\n"
+        "- Analytical methodology choices (e.g., independent counts vs sequential funnel)\n"
+        "- Stylistic preferences (CTE vs subquery, COUNT(*) vs COUNT(col))\n"
+        "- 'Could be better' suggestions — if it returns correct numbers, accept it\n"
+        "- Date anchoring using MAX(date_col) or hardcoded dates from the data\n"
+        "- Missing optimizations or indexes\n\n"
+        "The visualization layer handles ordering, formatting, drop-off calculations, "
+        "and chart rendering automatically. Do not reject because the output shape "
+        "isn't ideal for display — that is handled downstream.\n\n"
+        "Default to ACCEPT. When in doubt, ACCEPT.\n\n"
         "Respond with JSON only: {\"acceptable\": true/false, \"reason\": \"...\", \"suggested_fix\": \"...\"}"
     )
 
@@ -559,29 +645,29 @@ def _critic_check(
         }
 
     try:
-        result, error = _chat_json(
+        result, error, llm_call = _chat_json_traced(
             llm=llm,
             system=system,
             payload=payload,
             normalize=_normalize_critic,
-            purpose="result critic",
+            purpose="critic",
         )
         if result is None:
             # If critic call fails, accept the result (don't block on critic errors)
             logger.warning("Critic check failed: %s — accepting result", error)
-            return True, None, None
+            return True, None, None, llm_call
 
         if result["acceptable"]:
             logger.info("Critic accepted: SQL looks correct for question")
-            return True, None, None
+            return True, None, None, llm_call
 
         reason = result["reason"] or "Result quality issue detected"
         fix = result["suggested_fix"] or None
         logger.info("Critic rejected: %s | Suggested fix: %s", reason, fix)
-        return False, reason, fix
+        return False, reason, fix, llm_call
     except Exception as exc:
         logger.warning("Critic check exception: %s — accepting result", exc)
-        return True, None, None
+        return True, None, None, None
 
 
 def _execute_document_step(
@@ -621,6 +707,7 @@ def _execute_document_step(
         "status": "success",
         "kind": "document",
         "title": action.get("title") or source,
+        "reason": action.get("reason", ""),
         "answer_mode": "table",
         "sql": None,
         "sources": [source],
@@ -628,6 +715,35 @@ def _execute_document_step(
         "rows": rows,
         "truncated": len(rows) >= MAX_TABLE_RESULT_ROWS,
     }
+
+
+def _friendly_failure_message(warnings: list[str]) -> str:
+    """Turn raw warnings into a human-friendly failure explanation."""
+    if not warnings:
+        return "I wasn't able to find the data needed to answer that. Could you try rephrasing the question or asking about a specific table?"
+
+    combined = " ".join(w.lower() for w in warnings)
+
+    if "attempt limit" in combined:
+        return "I tried multiple approaches but couldn't get the right result within the attempt limit. Could you try rephrasing the question or breaking it into simpler parts?"
+
+    if "unauthorized" in combined or "not allowed" in combined:
+        return "I don't have access to the data source needed for this question. You could try asking about a different table, or rephrase your question to use the data I do have access to."
+
+    if "no such column" in combined:
+        return "The column I tried to query doesn't exist in this table. Could you check the available columns and try a more specific question?"
+
+    if "no such table" in combined:
+        return "The table I tried to query doesn't exist. You can ask me which tables I have access to, and I'll work from there."
+
+    if "syntax error" in combined or "sql error" in combined:
+        return "I had trouble generating the right query for this. Could you try simplifying the question or breaking it into smaller parts?"
+
+    if "returned no rows" in combined or "no rows" in combined:
+        return "The query ran but returned no matching data. You might want to try a broader date range or different filters."
+
+    # Default: don't dump raw warning text
+    return "I wasn't able to complete this query. Try rephrasing the question or breaking it into smaller steps — that usually helps me get to the right answer."
 
 
 def _synthesize_response(
@@ -639,32 +755,38 @@ def _synthesize_response(
     evidence: list[dict[str, Any]],
     warnings: list[str],
     conversation_context: list[dict[str, Any]],
-) -> str:
+) -> tuple[str, dict[str, Any] | None]:
+    """Synthesize the final response. Returns (response_text, llm_call_record)."""
     if not evidence:
         if conversation_context:
             system = _role_system_prompt(agent, role) + (
                 "\n\nAnswer using the shared investigation context only. "
                 "Be clear that you are referencing earlier teammate findings rather than fresh data."
             )
-            user = json.dumps(
-                {
-                    "question": query,
-                    "plan": plan,
-                    "conversation_context": conversation_context,
-                    "warnings": warnings,
-                },
-                ensure_ascii=True,
-            )
+            user_payload = {
+                "question": query,
+                "plan": plan,
+                "conversation_context": conversation_context,
+                "warnings": warnings,
+            }
+            user = json.dumps(user_payload, ensure_ascii=True)
+            _start = time.monotonic()
             try:
                 text = llm.chat_text(system=system, user=user).strip()
+                llm_call = {
+                    "stage": "synthesizer",
+                    "system_prompt": system[:500],
+                    "user_payload": _truncate_payload(user_payload),
+                    "raw_response": text[:2000],
+                    "parsed_result": None,
+                    "duration_ms": round((time.monotonic() - _start) * 1000),
+                }
                 if text:
-                    return text
+                    return text, llm_call
             except Exception as exc:
                 logger.warning("Shared-context synthesis failed: %s", exc)
-        bounded_warning = next((warning for warning in reversed(warnings) if "attempt limit" in warning.lower()), None)
-        if warnings:
-            return bounded_warning or warnings[0]
-        return "I could not find enough evidence in my allowed sources to answer that."
+        # Generate a human-friendly failure message instead of dumping raw warnings
+        return _friendly_failure_message(warnings), None
 
     system = _role_system_prompt(agent, role) + (
         "\n\nWrite a concise (3-4 lines), evidence-grounded answer with specific numbers from the data. "
@@ -688,23 +810,30 @@ def _synthesize_response(
                 entry["data_note"] = f"Showing first 30 of {len(rows)} rows"
         evidence_for_llm.append(entry)
 
-    user = json.dumps(
-        {
-            "question": query,
-            "plan": plan,
-            "evidence": evidence_for_llm,
-            "warnings": warnings,
-            "conversation_context": conversation_context,
-        },
-        ensure_ascii=True,
-    )
+    user_payload = {
+        "question": query,
+        "plan": plan,
+        "evidence": evidence_for_llm,
+        "warnings": warnings,
+        "conversation_context": conversation_context,
+    }
+    user = json.dumps(user_payload, ensure_ascii=True)
+    _start = time.monotonic()
     try:
         text = llm.chat_text(system=system, user=user).strip()
+        llm_call = {
+            "stage": "synthesizer",
+            "system_prompt": system[:500],
+            "user_payload": _truncate_payload(user_payload),
+            "raw_response": text[:2000],
+            "parsed_result": None,
+            "duration_ms": round((time.monotonic() - _start) * 1000),
+        }
         if text:
-            return text
+            return text, llm_call
     except Exception as exc:
         logger.warning("Synthesis failed, using deterministic summary: %s", exc)
-    return " ".join(item["summary"] for item in evidence if item.get("summary")).strip()
+    return " ".join(item["summary"] for item in evidence if item.get("summary")).strip(), None
 
 
 def _role_system_prompt(agent: str, role: dict[str, Any]) -> str:
@@ -713,7 +842,7 @@ def _role_system_prompt(agent: str, role: dict[str, Any]) -> str:
     tables = ", ".join(role.get("allowed_tables", []))
     skills = ", ".join(role.get("skills", []))
     return (
-        f"You are {role_name} for ZaikaNow.\n"
+        f"You are {role_name}.\n"
         f"Persona: {persona}\n"
         f"Allowed database tables: {tables or 'None'}\n"
         f"Allowed documents: {', '.join(role.get('allowed_documents', [])) or 'None'}\n"
@@ -822,6 +951,7 @@ def _normalize_action(action: dict[str, Any], plan: dict[str, Any], source_metad
     answer_mode = str(action.get("answer_mode") or "table").strip().lower()
     if answer_mode not in {"metric", "chart", "table", "text"}:
         answer_mode = "table"
+    chart_type = _normalize_chart_type(action.get("chart_type")) if answer_mode == "chart" else None
     document = str(action.get("document") or "").strip()
     if document and document not in allowed_sources:
         document = ""
@@ -834,6 +964,7 @@ def _normalize_action(action: dict[str, Any], plan: dict[str, Any], source_metad
         "document_terms": [str(term).strip() for term in raw_document_terms if str(term).strip()][:3],
         "title": str(action.get("title") or "").strip() or "Investigation result",
         "answer_mode": answer_mode,
+        "chart_type": chart_type,
         "target_tables": plan.get("target_tables", []),
     }
 
@@ -852,9 +983,10 @@ def _generic_plan(source_metadata: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def _build_artifacts_and_citations(evidence: list[dict[str, Any]], agent: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+def _build_artifacts_and_citations(evidence: list[dict[str, Any]], agent: str, user_query: str = "", llm: LLMClient | None = None) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     artifacts: list[dict[str, Any]] = []
     citations: list[dict[str, Any]] = []
+    llm_calls: list[dict[str, Any]] = []
     for item in evidence:
         citation = {
             "citation_id": item["evidence_id"],
@@ -863,15 +995,151 @@ def _build_artifacts_and_citations(evidence: list[dict[str, Any]], agent: str) -
             "summary": item["summary"],
         }
         citations.append(citation)
-        artifacts.append(_artifact_from_evidence(item, citation["citation_id"], agent))
-    return artifacts, citations
+        artifact, trace_calls = _artifact_from_evidence(item, citation["citation_id"], agent, user_query=user_query, llm=llm)
+        artifacts.append(artifact)
+        llm_calls.extend(trace_calls)
+    return artifacts, citations, llm_calls
 
 
-def _artifact_from_evidence(item: dict[str, Any], citation_id: str, agent: str) -> dict[str, Any]:
+def _generate_vega_lite_spec(
+    user_query: str,
+    columns: list[str],
+    rows: list[dict[str, Any]],
+    llm: LLMClient,
+    suggested_chart_type: str = "",
+) -> tuple[dict[str, Any] | None, dict[str, Any]]:
+    """Ask the LLM to produce a complete Vega-Lite spec for the data.
+
+    Returns (vega_spec, trace_record).  vega_spec is a complete Vega-Lite v5
+    JSON dict with data embedded, or a dict with ``chart_type`` set to
+    ``"table"`` or ``"ask_user"`` for non-chart results.
+    Returns (None, trace_record) on failure.
+    """
+    system = (
+        "You are a data-visualization expert. Given a user question and SQL result "
+        "columns + sample rows, return a COMPLETE Vega-Lite v5 JSON spec that best "
+        "answers the question visually.\n\n"
+        "RULES:\n"
+        "1. Return ONLY valid JSON — no markdown fences, no explanation.\n"
+        "2. The top-level object MUST contain '$schema': 'https://vega.github.io/schema/vega-lite/v5.json'.\n"
+        "3. Embed the data via the 'data' key: {\"data\": {\"values\": \"__DATA__\"}}.\n"
+        "   Use the literal string \"__DATA__\" as a placeholder — the system will inject the real rows.\n"
+        "4. Use these dark-theme defaults in a top-level 'config' key:\n"
+        '   {"config": {"background": "transparent", "view": {"stroke": "transparent"},\n'
+        '    "axis": {"labelColor": "#94a3b8", "titleColor": "#94a3b8", "gridColor": "#1e293b", "domainColor": "#334155"},\n'
+        '    "legend": {"labelColor": "#94a3b8", "titleColor": "#94a3b8"},\n'
+        '    "title": {"color": "#e2e8f0"}}}\n'
+        "5. Use width 'container' and height between 200-300.\n"
+        "6. Preferred color palette (in order): #10B981, #38BDF8, #F59E0B, #A855F7, #EC4899, #EF4444.\n"
+        "   Set explicit scale range when using color encoding.\n"
+        "7. NO custom JavaScript expressions. Pure declarative JSON only.\n\n"
+        "CHART SELECTION GUIDELINES:\n"
+        "- Time series → line chart (temporal X axis)\n"
+        "- Categorical comparison → bar chart\n"
+        "- Funnel / stage data → horizontal bar chart with stages on Y axis, sorted by logical process order "
+        "(NOT by value). Use 'sort' on the Y encoding with an explicit stage order array.\n"
+        "- Funnel comparison across periods → use 'facet' or 'row'/'column' encoding to show separate "
+        "sub-charts per period, each with stages on Y and counts on X.\n"
+        "- Distribution → histogram\n"
+        "- Part-of-whole → arc (pie/donut) mark\n"
+        "- Correlation → scatter / point mark\n"
+        "- Two metrics with very different scales → layer with independent Y axes (resolve: {scale: {y: 'independent'}})\n\n"
+        "SPECIAL RETURN VALUES (instead of a Vega-Lite spec):\n"
+        '- If data is genuinely tabular with no visual pattern, return: {"chart_type": "table"}\n'
+        '- If query is ambiguous and you cannot determine what to plot, return: '
+        '{"chart_type": "ask_user", "clarification": "<short question>"}\n\n'
+        "Prefer charts over tables. Most analytical queries benefit from visualization.\n"
+    )
+    # Send only a sample to the LLM — the full data is injected later
+    sample = rows[:8]
+    payload_dict: dict[str, Any] = {
+        "question": user_query,
+        "columns": columns,
+        "sample_rows": sample,
+        "total_rows": len(rows),
+    }
+    if suggested_chart_type:
+        payload_dict["suggested_chart_type"] = suggested_chart_type
+    payload = json.dumps(payload_dict, ensure_ascii=True)
+    _start = time.monotonic()
+    try:
+        result = llm.chat(system=system, user=payload)
+        duration = round((time.monotonic() - _start) * 1000)
+        trace_record = {
+            "stage": "vega_lite_generation",
+            "system_prompt": system[:600],
+            "user_payload": _truncate_payload(payload_dict),
+            "parsed_result": _truncate_payload(result),
+            "duration_ms": duration,
+        }
+        if not isinstance(result, dict):
+            trace_record["error"] = "LLM did not return a JSON object"
+            return None, trace_record
+        # Special non-chart responses
+        if result.get("chart_type") in ("table", "ask_user"):
+            return result, trace_record
+        # Validate it looks like a Vega-Lite spec
+        if result.get("$schema") or result.get("mark") or result.get("layer") or result.get("concat") or result.get("facet") or result.get("spec"):
+            # Inject actual data in place of __DATA__ placeholder
+            result = _inject_vega_data(result, rows)
+            return result, trace_record
+        trace_record["error"] = "Response is neither a Vega-Lite spec nor table/ask_user"
+        return None, trace_record
+    except Exception as exc:
+        duration = round((time.monotonic() - _start) * 1000)
+        return None, {
+            "stage": "vega_lite_generation",
+            "system_prompt": system[:600],
+            "user_payload": _truncate_payload(payload_dict),
+            "parsed_result": None,
+            "error": str(exc),
+            "duration_ms": duration,
+        }
+
+
+def _inject_vega_data(spec: dict[str, Any], rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Recursively replace ``"__DATA__"`` placeholders with actual row data."""
+    spec = dict(spec)  # shallow copy
+    if "data" in spec:
+        d = spec["data"]
+        if isinstance(d, dict) and d.get("values") == "__DATA__":
+            spec["data"] = {"values": rows}
+        elif d == "__DATA__":
+            spec["data"] = {"values": rows}
+    # Handle nested specs (facet, concat, layer, etc.)
+    for key in ("spec", "layer", "concat", "hconcat", "vconcat"):
+        if key in spec:
+            child = spec[key]
+            if isinstance(child, dict):
+                spec[key] = _inject_vega_data(child, rows)
+            elif isinstance(child, list):
+                spec[key] = [_inject_vega_data(c, rows) if isinstance(c, dict) else c for c in child]
+    return spec
+
+
+def _artifact_from_evidence(item: dict[str, Any], citation_id: str, agent: str, user_query: str = "", llm: LLMClient | None = None) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     rows = item.get("rows", [])
     columns = item.get("columns", [])
     answer_mode = item.get("answer_mode", "table")
+    chart_type_hint = item.get("chart_type", "")
     numeric_columns = [col for col in columns if _column_is_numeric(rows, col)]
+    trace_calls: list[dict[str, Any]] = []
+
+    table_artifact = {
+        "kind": "table",
+        "title": item["title"],
+        "columns": columns,
+        "rows": rows,
+        "citation_ids": [citation_id],
+        "purpose": "supporting_evidence",
+        "display_mode": "board_default",
+        "source_role": agent,
+        "confidence": "medium",
+        "card_variant": "table",
+        "summary": item["summary"],
+    }
+
+    # Metric: single row, single value
     if rows and answer_mode == "metric" and len(rows) == 1 and numeric_columns:
         value_col = numeric_columns[0]
         return {
@@ -886,106 +1154,38 @@ def _artifact_from_evidence(item: dict[str, Any], citation_id: str, agent: str) 
             "confidence": "medium",
             "card_variant": "metric",
             "summary": item["summary"],
-        }
-    if rows and answer_mode == "table":
-        return {
-            "kind": "table",
-            "title": item["title"],
-            "columns": columns,
-            "rows": rows,
-            "citation_ids": [citation_id],
-            "purpose": "supporting_evidence",
-            "display_mode": "board_default",
-            "source_role": agent,
-            "confidence": "medium",
-            "card_variant": "table",
-            "summary": item["summary"],
-        }
-    if rows and len(columns) >= 2 and numeric_columns and (answer_mode == "chart" or len(rows) <= 30):
-        label_column = next((col for col in columns if col not in numeric_columns), columns[0])
-        value_columns = [col for col in numeric_columns if col != label_column]
-        if not value_columns:
-            value_columns = numeric_columns[:1]
+        }, trace_calls
 
-        # Detect long-format data that should be pivoted into multi-series.
-        # Pattern: exactly 3 columns — label, category (string), value (numeric).
-        # Example: date | platform | order_count → pivot into one series per platform.
-        non_numeric_non_label = [c for c in columns if c not in numeric_columns and c != label_column]
-        if len(value_columns) == 1 and len(non_numeric_non_label) == 1:
-            category_column = non_numeric_non_label[0]
-            val_col = value_columns[0]
-            categories = list(dict.fromkeys(str(row.get(category_column, "")) for row in rows))
-            if 2 <= len(categories) <= 8:
-                # Pivot: group by label, create one series per category
-                from collections import OrderedDict
-                label_order: list[str] = list(dict.fromkeys(str(row.get(label_column, "")) for row in rows))
-                pivoted: dict[str, dict[str, float]] = OrderedDict()
-                for lbl in label_order:
-                    pivoted[lbl] = {cat: 0.0 for cat in categories}
-                for row in rows:
-                    lbl = str(row.get(label_column, ""))
-                    cat = str(row.get(category_column, ""))
-                    pivoted[lbl][cat] = float(row.get(val_col, 0) or 0)
-                chart_type = "line" if _looks_like_time_column(rows, label_column) else "bar"
-                label_order = _normalize_week_labels(label_order)
-                series = [
-                    {"name": cat, "values": [pivoted[lbl][cat] for lbl in pivoted]}
-                    for cat in categories
-                ]
-                from agent_router.downsample import downsample_chart
-                label_order, series, _ds = downsample_chart(label_order, series)
-                return {
-                    "kind": "chart",
-                    "title": item["title"],
-                    "chart_type": chart_type,
-                    "labels": label_order,
-                    "series": series,
-                    "multi_measure": False,
-                    "citation_ids": [citation_id],
-                    "purpose": "supporting_evidence",
-                    "display_mode": "board_default",
-                    "source_role": agent,
-                    "confidence": "medium",
-                    "card_variant": "chart",
-                    "summary": item["summary"],
-                }
+    # LLM decides display: Vega-Lite chart, table, or ask_user — no answer_mode gate
+    if rows and len(columns) >= 2 and numeric_columns and llm and user_query:
+        vega_spec, vega_trace = _generate_vega_lite_spec(
+            user_query, columns, rows, llm,
+            suggested_chart_type=chart_type_hint or "",
+        )
+        trace_calls.append(vega_trace)
+        if vega_spec:
+            if vega_spec.get("chart_type") == "table":
+                return table_artifact, trace_calls
+            if vega_spec.get("chart_type") == "ask_user":
+                table_artifact["display_clarification"] = vega_spec.get("clarification", "How would you like this data displayed?")
+                return table_artifact, trace_calls
+            # Return a vega_chart artifact
+            return {
+                "kind": "vega_chart",
+                "title": item["title"],
+                "vega_spec": vega_spec,
+                "citation_ids": [citation_id],
+                "purpose": "supporting_evidence",
+                "display_mode": "board_default",
+                "source_role": agent,
+                "confidence": "medium",
+                "card_variant": "chart",
+                "summary": item["summary"],
+                "columns": columns,
+                "rows": rows[:200],
+            }, trace_calls
 
-        chart_type = "line" if _looks_like_time_column(rows, label_column) else "bar"
-        labels_list = _normalize_week_labels([str(row.get(label_column, "")) for row in rows])
-        series = [
-            {"name": col, "values": [float(row.get(col, 0) or 0) for row in rows]}
-            for col in value_columns
-        ]
-        from agent_router.downsample import downsample_chart
-        labels_list, series, _ds = downsample_chart(labels_list, series)
-        return {
-            "kind": "chart",
-            "title": item["title"],
-            "chart_type": chart_type,
-            "labels": labels_list,
-            "series": series,
-            "multi_measure": len(value_columns) > 1,
-            "citation_ids": [citation_id],
-            "purpose": "supporting_evidence",
-            "display_mode": "board_default",
-            "source_role": agent,
-            "confidence": "medium",
-            "card_variant": "chart",
-            "summary": item["summary"],
-        }
-    return {
-        "kind": "table",
-        "title": item["title"],
-        "columns": columns,
-        "rows": rows,
-        "citation_ids": [citation_id],
-        "purpose": "supporting_evidence",
-        "display_mode": "board_default",
-        "source_role": agent,
-        "confidence": "medium",
-        "card_variant": "table",
-        "summary": item["summary"],
-    }
+    return table_artifact, trace_calls
 
 
 def _structured_evidence_response(query: str, evidence: list[dict[str, Any]]) -> str | None:
@@ -1101,9 +1301,14 @@ def _normalize_week_labels(labels: list[str]) -> list[str]:
     return normalized
 
 
-def _looks_like_time_column(rows: list[dict[str, Any]], column: str) -> bool:
-    values = [str(row.get(column, "")) for row in rows[:3]]
-    return all(any(char.isdigit() for char in value) and ("-" in value or ":" in value) for value in values if value)
+_VALID_CHART_TYPES = {"bar", "line", "funnel", "pie", "scatter", "heatmap", "histogram", "box", "dual_axis_line"}
+
+
+def _normalize_chart_type(value: Any) -> str | None:
+    chart_type = str(value or "").strip().lower()
+    if chart_type in _VALID_CHART_TYPES:
+        return chart_type
+    return None
 
 
 def _column_is_numeric(rows: list[dict[str, Any]], column: str) -> bool:
@@ -1314,3 +1519,63 @@ def _chat_json(
                 "instruction": "Return a valid JSON object that matches the response schema.",
             }
     return None, latest_error
+
+
+def _chat_json_traced(
+    llm: LLMClient,
+    system: str,
+    payload: dict[str, Any],
+    normalize: Any,
+    purpose: str,
+) -> tuple[dict[str, Any] | None, str | None, dict[str, Any]]:
+    """Like _chat_json but also returns an LLM call trace record."""
+    latest_error: str | None = None
+    current_payload = dict(payload)
+    raw_response = ""
+    _start = time.monotonic()
+    for attempt in range(2):
+        try:
+            user_str = json.dumps(current_payload, ensure_ascii=True)
+            value, raw_response = llm.chat_raw(system=system, user=user_str)
+            if not isinstance(value, dict):
+                raise ValueError(f"{purpose} did not return a JSON object.")
+            normalized = normalize(value)
+            call_record = {
+                "stage": purpose,
+                "system_prompt": system[:500],
+                "user_payload": _truncate_payload(payload),
+                "raw_response": raw_response[:2000],
+                "parsed_result": _truncate_payload(normalized),
+                "duration_ms": round((time.monotonic() - _start) * 1000),
+            }
+            return normalized, None, call_record
+        except Exception as exc:
+            latest_error = str(exc)
+            logger.warning("%s attempt %s failed: %s", purpose.title(), attempt + 1, exc)
+            current_payload = {
+                **payload,
+                "previous_error": latest_error,
+                "instruction": "Return a valid JSON object that matches the response schema.",
+            }
+    call_record = {
+        "stage": purpose,
+        "system_prompt": system[:500],
+        "user_payload": _truncate_payload(payload),
+        "raw_response": raw_response[:2000] if raw_response else f"Error: {latest_error}",
+        "parsed_result": None,
+        "duration_ms": round((time.monotonic() - _start) * 1000),
+    }
+    return None, latest_error, call_record
+
+
+def _truncate_payload(obj: Any, max_str: int = 500) -> Any:
+    """Truncate large string values in dicts/lists for trace storage."""
+    if isinstance(obj, dict):
+        return {k: _truncate_payload(v, max_str) for k, v in obj.items()}
+    if isinstance(obj, list):
+        if len(obj) > 10:
+            return [_truncate_payload(item, max_str) for item in obj[:10]] + [f"... ({len(obj) - 10} more)"]
+        return [_truncate_payload(item, max_str) for item in obj]
+    if isinstance(obj, str) and len(obj) > max_str:
+        return obj[:max_str] + "..."
+    return obj

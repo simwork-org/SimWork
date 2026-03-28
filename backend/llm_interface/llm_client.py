@@ -144,6 +144,41 @@ class LLMClient:
 
         return self._extract_json(raw)
 
+    def chat_raw(self, system: str, user: str) -> tuple[dict[str, Any], str]:
+        """Send a prompt and return (parsed JSON dict, raw response text)."""
+        if self.provider in {"openai", "deepseek"}:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                response_format={"type": "json_object"},
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+                temperature=self.temperature,
+            )
+            raw = response.choices[0].message.content
+        elif self.provider == "ollama":
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": system + "\n\nReturn ONLY a valid JSON object."},
+                    {"role": "user", "content": user},
+                ],
+                temperature=self.temperature,
+            )
+            raw = response.choices[0].message.content
+        else:  # anthropic
+            response = self.client.messages.create(
+                model=self.model,
+                system=system + "\n\nReturn ONLY a valid JSON object.",
+                messages=[{"role": "user", "content": user}],
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+            )
+            raw = self._extract_anthropic_text(response)
+
+        return self._extract_json(raw), raw or ""
+
     def chat_text(self, system: str, user: str) -> str:
         """Send a prompt and return plain text."""
         if self.provider in {"openai", "deepseek", "ollama"}:

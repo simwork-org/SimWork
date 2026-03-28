@@ -36,8 +36,8 @@ os.makedirs(TABLES_DIR, exist_ok=True)
 # ---------------------------------------------------------------------------
 START_DATE = datetime(2024, 10, 1)
 END_DATE = datetime(2025, 3, 31, 23, 59, 59)
-PROMO_START = datetime(2024, 12, 26)
-PROMO_END = datetime(2025, 1, 5)
+PROMO_START = datetime(2024, 12, 20)
+PROMO_END = datetime(2024, 12, 26)
 MIGRATION_DATE = datetime(2025, 1, 10)
 HOTFIX_DATE = datetime(2025, 2, 1)
 TRUST_DAMAGE_DATE = datetime(2025, 2, 16)
@@ -363,52 +363,53 @@ def generate_menu_items(restaurants):
 #    NO platform/city columns — JOIN to users for those
 # ---------------------------------------------------------------------------
 def daily_order_target(current: datetime) -> int:
-    """~275/day baseline, with promo spike and trust damage dip."""
-    base_by_month = {10: 240, 11: 260, 12: 290, 1: 275, 2: 255, 3: 265}
-    base = base_by_month[current.month]
-    # Weekend bump
+    """Flat ~270/day baseline. Orders are derived from funnel sessions, but this
+    function is kept for any non-session order logic. The actual order volume is
+    driven by session_target_for() + session_completion_prob()."""
+    base = 270
     if current.weekday() in (5, 6):
-        base = int(base * 1.12)
-    # Easy problem: promo spike — sharply visible, 25% bump
+        base = int(base * 1.10)
     if is_promo_period(current):
-        base = int(base * 1.25)
-    # Republic Day minor bump
-    if datetime(2025, 1, 24).date() <= current.date() <= datetime(2025, 1, 26).date():
-        base = int(base * 1.08)
-    # Hard problem: trust damage — subtle 8% overall dip
+        base = int(base * 1.12)
     if phase_for_date(current) == "trust_damage":
         base = int(base * 0.92)
-    return max(150, int(jitter(base, 0.08)))
+    return max(150, int(jitter(base, 0.04)))
 
 
-def order_status_probs(current: datetime, platform: str, city: str, user_type: str) -> tuple[float, float]:
-    """Return (fail_rate, cancel_rate) based on phase/segment."""
+def order_status_probs(current: datetime, platform: str, city: str, user_type: str, method: str = "upi") -> tuple[float, float]:
+    """Return (fail_rate, cancel_rate) based on phase/segment/payment method."""
     phase = phase_for_date(current)
     fail_rate = 0.04
     cancel_rate = 0.10
 
     is_primary = city_is_primary(city)
+    is_upi = method == "upi"
 
     if phase == "incident":
-        # Medium problem: payment failures spike
-        if platform == "android" and is_primary:
-            fail_rate = 0.18
-            cancel_rate = 0.16
-        elif platform == "ios" and is_primary:
-            fail_rate = 0.09
-            cancel_rate = 0.13
-        elif platform == "web" and is_primary:
-            fail_rate = 0.07
+        # UPI orders fail at higher rates due to RupeeFlow v3 migration.
+        # Non-UPI payment methods are unaffected by the migration.
+        if is_upi and platform == "android" and is_primary:
+            fail_rate = 0.22
+            cancel_rate = 0.18
+        elif is_upi and is_primary:
+            fail_rate = 0.14
+            cancel_rate = 0.14
+        elif is_upi:
+            fail_rate = 0.10
             cancel_rate = 0.12
         else:
-            fail_rate = 0.06
+            # Non-UPI: near baseline — migration doesn't affect these methods
+            fail_rate = 0.05
             cancel_rate = 0.11
     elif phase == "partial_recovery":
-        if platform == "android" and is_primary:
-            fail_rate = 0.09
+        if is_upi and platform == "android" and is_primary:
+            fail_rate = 0.08
             cancel_rate = 0.13
+        elif is_upi:
+            fail_rate = 0.06
+            cancel_rate = 0.11
         else:
-            fail_rate = 0.05
+            fail_rate = 0.04
             cancel_rate = 0.11
     elif phase == "trust_damage":
         # Technical metrics mostly recovered
@@ -454,7 +455,10 @@ def generate_orders(users, restaurants, restaurant_menu_map, menu_items, drivers
         current = s["date"]
         phase = phase_for_date(current)
 
-        fail_rate, cancel_rate = order_status_probs(current, platform, city, user_type)
+        # Use payment method assigned at session creation (in generate_funnel_events)
+        method = s.get("payment_method") or payment_method_for(platform)
+
+        fail_rate, cancel_rate = order_status_probs(current, platform, city, user_type, method)
 
         # Hard problem: trust-damaged cohort cancels 20% of orders
         if phase == "trust_damage" and user_type in {"returning", "power"} and platform == "android" and city_is_primary(city):
@@ -526,9 +530,12 @@ def generate_orders(users, restaurants, restaurant_menu_map, menu_items, drivers
         order_id += 1
 
     write_table("orders", ["order_id", "user_id", "restaurant_id", "driver_id", "session_id", "order_status", "total_amount", "created_at"], order_rows)
-    print(f"Generating order_items...")
+    print("Generating order_items...")
     write_table("order_items", ["order_item_id", "order_id", "item_id", "quantity"], oi_rows)
-    return order_rows, oi_rows, user_lookup
+    # Build session → payment method mapping for payment generation (both completed and failed)
+    session_method_map = {s["session_id"]: s.get("payment_method", "") for s in completed_sessions}
+    session_method_map.update({s["session_id"]: s.get("payment_method", "") for s in failed_sessions})
+    return order_rows, oi_rows, user_lookup, session_method_map
 
 
 
@@ -550,30 +557,29 @@ def payment_outcome(current: datetime, platform: str, city: str, user_type: str,
     is_upi = method == "upi"
     base_success = 0.95 if is_upi else 0.93
     timeout = 0.02
-    reversed_rate = 0.01
 
     if method == "cod":
         return "success", 0, ""
 
     if phase == "incident":
         if platform == "android" and is_primary and is_upi:
-            base_success, timeout, reversed_rate = 0.68, 0.18, 0.05
+            base_success, timeout = 0.68, 0.18
         elif is_upi and is_primary:
-            base_success, timeout, reversed_rate = 0.79, 0.11, 0.03
+            base_success, timeout = 0.79, 0.11
         elif is_upi:
-            base_success, timeout, reversed_rate = 0.86, 0.08, 0.02
-        else:
-            base_success, timeout = 0.91, 0.04
+            base_success, timeout = 0.86, 0.08
+        # Non-UPI methods stay at baseline during incident — the migration only affects UPI
+        # (previously 0.91 which was too close to baseline, making all methods look equally affected)
     elif phase == "partial_recovery":
         if platform == "android" and is_primary and is_upi:
-            base_success, timeout, reversed_rate = 0.84, 0.07, 0.02
+            base_success, timeout = 0.84, 0.07
         elif is_upi:
             base_success, timeout = 0.89, 0.05
         else:
             base_success, timeout = 0.93, 0.03
     elif phase == "trust_damage":
         if platform == "android" and is_primary and is_upi:
-            base_success, timeout, reversed_rate = 0.90, 0.04, 0.015
+            base_success, timeout = 0.90, 0.04
 
     roll = random.random()
     if roll < base_success:
@@ -601,7 +607,10 @@ def payment_outcome(current: datetime, platform: str, city: str, user_type: str,
     return status, max(0, processing_time_ms), error
 
 
-def generate_payments(orders, user_lookup):
+def generate_payments(orders, user_lookup, session_method_map):
+    """Generate payments. Uses pre-assigned payment methods from session_method_map
+    so that payment method aligns with order status (UPI orders fail more during incident).
+    """
     print("Generating payments...")
     rows = []
     for idx, order in enumerate(orders, start=1):
@@ -609,8 +618,8 @@ def generate_payments(orders, user_lookup):
         current = datetime.strptime(created_at_str, "%Y-%m-%d %H:%M:%S")
         info = user_lookup[user_id]
         platform, city, user_type = info["platform"], info["city"], info["user_type"]
-        phase = phase_for_date(current)
-        method = payment_method_for(platform)
+        # Use pre-assigned method if available (completed sessions), else generate new
+        method = session_method_map.get(session_id) or payment_method_for(platform)
         if method == "cod":
             provider = "cash_on_delivery"
         else:
@@ -669,40 +678,49 @@ def generate_drivers(n: int = 150):
 #    Keeps platform (session-level device context). No city — JOIN to users.
 # ---------------------------------------------------------------------------
 def session_target_for(current: datetime) -> int:
-    base = {10: 830, 11: 890, 12: 980, 1: 940, 2: 870, 3: 910}[current.month]
+    base = 900  # flat baseline across all months
     if current.weekday() in (5, 6):
-        base = int(base * 1.1)
+        base = int(base * 1.10)
     if is_promo_period(current):
-        base = int(base * 1.20)
+        base = int(base * 1.12)
     if phase_for_date(current) == "trust_damage":
         base = int(base * 0.91)
-    return max(600, int(jitter(base, 0.07)))
+    return max(600, int(jitter(base, 0.04)))
 
 
-def session_completion_prob(current: datetime, platform: str, city: str, user_type: str) -> float:
+def session_completion_prob(current: datetime, platform: str, city: str, user_type: str, method: str = "upi") -> float:
+    """Probability that a session reaching payment_attempt completes to order_complete.
+
+    This is the KEY function controlling the Jan 10 cliff. During the incident
+    phase, UPI payments fail at much higher rates than other methods.
+    """
     phase = phase_for_date(current)
     is_primary = city_is_primary(city)
-    prob = 0.94
+    is_upi = method == "upi"
+
+    if phase == "baseline":
+        return 0.94
+
     if phase == "incident":
-        if platform == "android" and is_primary:
-            prob = 0.63
-        elif platform == "ios" and is_primary:
-            prob = 0.78
-        elif platform == "web" and is_primary:
-            prob = 0.84
-        else:
-            prob = 0.87
-    elif phase == "partial_recovery":
-        if platform == "android" and is_primary:
-            prob = 0.80
-        else:
-            prob = 0.89
-    elif phase == "trust_damage":
-        prob = 0.91
-        # Hard problem: power/returning users browse less
-        if user_type in {"returning", "power"} and platform == "android" and is_primary:
-            prob = 0.85
-    return prob
+        if is_upi and platform == "android" and is_primary:
+            return 0.53  # catastrophic — UPI callback broken
+        if is_upi and is_primary:
+            return 0.72  # bad — UPI degraded on iOS/web in primary metros
+        if is_upi:
+            return 0.82  # moderate — UPI in non-primary metros
+        return 0.93  # non-UPI methods unaffected
+
+    if phase == "partial_recovery":
+        if is_upi and platform == "android" and is_primary:
+            return 0.80
+        if is_upi:
+            return 0.89
+        return 0.93
+
+    # trust_damage phase
+    if user_type in {"returning", "power"} and platform == "android" and is_primary:
+        return 0.85  # behavioral avoidance persists
+    return 0.91
 
 
 def generate_funnel_events(users):
@@ -749,7 +767,9 @@ def generate_funnel_events(users):
                 device = random.choice(PROFILE["web_devices"])
                 app_version = "web_2025.01" if current < MIGRATION_DATE else "web_2025.02"
 
-            completion_prob = session_completion_prob(current, platform, city, user_type)
+            # Assign payment method at session creation so completion prob is method-aware
+            method = payment_method_for(platform)
+            completion_prob = session_completion_prob(current, platform, city, user_type, method)
             probs = base_probs[:]
             probs[-1] = completion_prob
             # Hard problem: trust-damaged cohort browses less
@@ -785,6 +805,7 @@ def generate_funnel_events(users):
                 "platform": platform,
                 "city": city,
                 "user_type": user_type,
+                "payment_method": method,
                 "timestamp": timestamp,
                 "date": current,
             }
@@ -979,13 +1000,13 @@ def generate_ux_changelog():
     print("Generating ux_changelog...")
     rows = [
         ["2024-12-18", "feature", "Added cuisine shortcuts for breakfast and biryani", "homepage", "all"],
-        ["2024-12-27", "feature", "New Year offer rail on the home feed", "homepage", "all"],
+        ["2024-12-20", "feature", "Christmas offer rail on the home feed", "homepage", "all"],
         ["2025-01-05", "ab_test", "Testing a denser cart summary layout", "cart", "all"],
         ["2025-01-08", "feature", "Updated restaurant ranking for repeat orders", "search", "all"],
         ["2025-01-10", "feature", "New payment success animation after confirmation", "checkout", "all"],
         ["2025-01-12", "bugfix", "Fixed checkout button alignment on smaller Android screens", "checkout", "android"],
         ["2025-01-20", "ab_test", "Testing simplified checkout review sheet", "checkout", "all"],
-        ["2025-01-25", "feature", "Republic Day specials collection", "homepage", "all"],
+        ["2025-01-25", "feature", "Republic Day homepage banner", "homepage", "all"],
         ["2025-02-08", "bugfix", "Improved failed-payment copy on the review screen", "checkout", "all"],
     ]
     write_table("ux_changelog", ["date", "change_type", "description", "affected_area", "platform"], rows)
@@ -1284,8 +1305,8 @@ def main():
     menu_items, restaurant_menu_map = generate_menu_items(restaurants)
     drivers = generate_drivers()
     _, completed_sessions, failed_sessions = generate_funnel_events(users)
-    orders, order_items, user_lookup = generate_orders(users, restaurants, restaurant_menu_map, menu_items, drivers, completed_sessions, failed_sessions)
-    payments = generate_payments(orders, user_lookup)
+    orders, order_items, user_lookup, session_method_map = generate_orders(users, restaurants, restaurant_menu_map, menu_items, drivers, completed_sessions, failed_sessions)
+    payments = generate_payments(orders, user_lookup, session_method_map)
     generate_reviews(orders)
     generate_support_tickets(users, orders)
     generate_usability_study()

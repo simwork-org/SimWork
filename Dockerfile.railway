@@ -15,11 +15,6 @@ COPY backend/ ./
 # Copy scenario data
 COPY scenarios/ ./scenarios/
 
-# Create data directory for persistent volume
-RUN mkdir -p /data
-
-# Default DB path points to persistent volume
-ENV SIMWORK_DB_PATH=/data/simwork.db
 ENV SIMWORK_SCENARIOS_DIR=/app/scenarios
 
 EXPOSE 8000

@@ -1,4 +1,14 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+import { buildLandingAuthUrl, inferCompanyIntent } from "@/lib/auth-routing";
+
+function normalizeApiBase(url: string): string {
+  const trimmed = url.trim().replace(/\/+$/, "");
+  if (trimmed.endsWith("/api/v1")) {
+    return trimmed.slice(0, -"/api/v1".length);
+  }
+  return trimmed;
+}
+
+const API_BASE = normalizeApiBase(process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000");
 const PREFIX = "/api/v1";
 
 let _authToken: string | null = null;
@@ -12,12 +22,24 @@ async function fetchJSON<T>(path: string, init?: RequestInit): Promise<T> {
   if (_authToken) {
     headers["Authorization"] = `Bearer ${_authToken}`;
   }
-  const res = await fetch(`${API_BASE}${path}`, {
-    headers,
-    ...init,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      headers,
+      ...init,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown network error";
+    throw new Error(`Cannot reach backend at ${API_BASE}${path}: ${message}`);
+  }
   if (res.status === 401 && typeof window !== "undefined") {
-    window.location.href = "/login";
+    const nextPath = `${window.location.pathname}${window.location.search}`;
+    if (window.location.pathname !== "/") {
+      window.location.href = buildLandingAuthUrl({
+        auth: inferCompanyIntent(nextPath) ? "company" : "candidate",
+        next: nextPath,
+      });
+    }
     throw new Error("Session expired");
   }
   if (!res.ok) {
@@ -54,6 +76,8 @@ interface ArtifactBase {
 export interface MetricArtifact extends ArtifactBase {
   kind: "metric";
   value?: string | number;
+  label?: string;
+  change?: number;
   unit?: string;
   subtitle?: string;
   labels?: string[];
@@ -64,10 +88,13 @@ export interface MetricArtifact extends ArtifactBase {
 
 export interface ChartArtifact extends ArtifactBase {
   kind: "chart";
-  chart_type?: "bar" | "line" | "funnel";
+  chart_type?: "bar" | "line" | "funnel" | "pie" | "scatter" | "heatmap" | "histogram" | "box" | "dual_axis_line";
   labels: string[];
   series: { name: string; values: number[] }[];
   multi_measure?: boolean;
+  dual_axis?: boolean;
+  primary_unit?: string;
+  secondary_unit?: string;
   unit?: string;
   columns?: string[];
   rows?: Record<string, string | number | null>[];
@@ -79,9 +106,17 @@ export interface TableArtifact extends ArtifactBase {
   rows: Record<string, string | number | null>[];
   labels?: string[];
   series?: { name: string; values: number[] }[];
+  display_clarification?: string;
 }
 
-export type Artifact = MetricArtifact | ChartArtifact | TableArtifact;
+export interface VegaChartArtifact extends ArtifactBase {
+  kind: "vega_chart";
+  vega_spec: Record<string, unknown>;
+  columns?: string[];
+  rows?: Record<string, string | number | null>[];
+}
+
+export type Artifact = MetricArtifact | ChartArtifact | TableArtifact | VegaChartArtifact;
 
 export interface Citation {
   citation_id: string;
@@ -170,6 +205,7 @@ export interface ScenarioDetail {
 export interface SessionStatus {
   session_id: string;
   scenario_id: string;
+  status: string;
   time_remaining_minutes: number;
   queries_made: number;
   saved_evidence_count: number;
@@ -189,7 +225,17 @@ interface QueryResponse {
 
 export interface ProposedAction {
   action: string;
-  priority: "P0" | "P1" | "P2";
+  priority: string;
+}
+
+export interface SessionSubmission {
+  id: number;
+  session_id: string;
+  root_cause: string;
+  proposed_actions: ProposedAction[];
+  stakeholder_summary: string;
+  supporting_evidence_ids: number[];
+  timestamp: string;
 }
 
 export interface DimensionScore {
@@ -237,10 +283,38 @@ export interface QueryLogDetail {
     kind?: string;
     answer_mode?: string;
     sql?: string;
+    python_code?: string;
     error?: string;
     summary?: string;
     sources?: string[];
+    rejection_reason?: string;
+    suggested_fix?: string;
+    critic_ok?: boolean;
+    critic_reason?: string;
+    duration_ms?: number;
+    rows_returned?: number;
     [key: string]: unknown;
+  }[];
+  trace?: {
+    intent?: string;
+    question_understanding?: string;
+    sub_questions?: string[];
+    effective_query?: string | null;
+    conversation_turns?: number;
+    plan_complexity?: string;
+    total_attempts?: number;
+    evidence_collected?: number;
+    total_duration_ms?: number;
+    [key: string]: unknown;
+  };
+  llm_calls?: {
+    stage: string;
+    step?: number;
+    system_prompt?: string;
+    user_payload?: Record<string, unknown>;
+    raw_response?: string;
+    parsed_result?: unknown;
+    duration_ms?: number;
   }[];
   timestamp: string;
 }
@@ -444,9 +518,150 @@ export async function getScoringResult(
   return fetchJSON(`${PREFIX}/sessions/${sessionId}/score`);
 }
 
+export async function getSubmission(
+  sessionId: string
+): Promise<SessionSubmission> {
+  return fetchJSON(`${PREFIX}/sessions/${sessionId}/submission`);
+}
+
 export async function getQueryLogDetail(
   sessionId: string,
   queryLogId: number
 ): Promise<QueryLogDetail> {
   return fetchJSON(`${PREFIX}/sessions/${sessionId}/query/${queryLogId}`);
+}
+
+// ── User / Role ─────────────────────────────────────────────────────
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  name?: string | null;
+  picture?: string | null;
+  role: string;
+  company_id?: number | null;
+}
+
+export async function getMe(): Promise<UserProfile> {
+  return fetchJSON(`${PREFIX}/me`);
+}
+
+export async function setMyRole(role: "company" | "candidate"): Promise<{ role: string }> {
+  return fetchJSON(`${PREFIX}/me/role`, {
+    method: "POST",
+    body: JSON.stringify({ role }),
+  });
+}
+
+export interface UserSessionSummary {
+  session_id: string;
+  scenario_id: string;
+  challenge_id?: string | null;
+  assessment_id?: string | null;
+  invite_token?: string | null;
+  started_at: string;
+  status: string;
+  assessment_title?: string | null;
+  company_name?: string | null;
+}
+
+export async function getMySessions(): Promise<{ sessions: UserSessionSummary[] }> {
+  return fetchJSON(`${PREFIX}/me/sessions`);
+}
+
+// ── Company ─────────────────────────────────────────────────────────
+
+export async function createCompany(name: string): Promise<{ id: number; name: string }> {
+  return fetchJSON(`${PREFIX}/companies`, {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+}
+
+export async function getMyCompany(): Promise<{ id: number; name: string; owner_user_id: string }> {
+  return fetchJSON(`${PREFIX}/companies/me`);
+}
+
+// ── Assessments ─────────────────────────────────────────────────────
+
+export interface Assessment {
+  id: string;
+  company_id: number;
+  scenario_id: string;
+  challenge_id?: string | null;
+  title?: string | null;
+  created_at: string;
+  candidate_total: number;
+  candidate_completed: number;
+  candidate_active: number;
+}
+
+export interface AssessmentCandidate {
+  session_id: string;
+  candidate_id: string;
+  started_at: string;
+  ended_at?: string | null;
+  status: string;
+  email?: string | null;
+  name?: string | null;
+  picture?: string | null;
+  overall_score?: number | null;
+  scored_at?: string | null;
+}
+
+export interface InviteInfo {
+  token: string;
+  candidate_email?: string | null;
+  created_at: string;
+  used_at?: string | null;
+  claimed_by_email?: string | null;
+  claimed_by_name?: string | null;
+}
+
+export async function createAssessment(
+  scenarioId: string,
+  challengeId?: string | null,
+  title?: string | null,
+): Promise<{ id: string }> {
+  return fetchJSON(`${PREFIX}/assessments`, {
+    method: "POST",
+    body: JSON.stringify({ scenario_id: scenarioId, challenge_id: challengeId, title }),
+  });
+}
+
+export async function listAssessments(): Promise<{ assessments: Assessment[] }> {
+  return fetchJSON(`${PREFIX}/assessments`);
+}
+
+export async function getAssessmentDetail(
+  assessmentId: string
+): Promise<{ assessment: Assessment; candidates: AssessmentCandidate[]; invites: InviteInfo[] }> {
+  return fetchJSON(`${PREFIX}/assessments/${assessmentId}`);
+}
+
+export async function generateInvite(
+  assessmentId: string,
+  candidateEmail?: string
+): Promise<{ token: string; invite_url: string }> {
+  return fetchJSON(`${PREFIX}/assessments/${assessmentId}/invite`, {
+    method: "POST",
+    body: JSON.stringify({ candidate_email: candidateEmail || null }),
+  });
+}
+
+// ── Invite ──────────────────────────────────────────────────────────
+
+export interface InviteValidation {
+  token: string;
+  scenario_id: string;
+  assessment_title?: string | null;
+  company_name?: string | null;
+}
+
+export async function validateInvite(token: string): Promise<InviteValidation> {
+  return fetchJSON(`${PREFIX}/invite/${token}`);
+}
+
+export async function claimInvite(token: string): Promise<{ session_id: string; claimed: boolean; company_name?: string; assessment_title?: string }> {
+  return fetchJSON(`${PREFIX}/invite/${token}/claim`, { method: "POST" });
 }

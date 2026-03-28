@@ -18,6 +18,7 @@ from investigation_logger.logger import (
     get_scoring_result,
     get_session,
     get_session_events,
+    get_submission,
     log_query,
     log_session_event,
     remove_evidence,
@@ -50,10 +51,16 @@ def _get_llm() -> LLMClient:
     return _llm
 
 
-def start_session(candidate_id: str, scenario_id: str, challenge_id: str | None = None) -> dict[str, Any]:
+def start_session(
+    candidate_id: str,
+    scenario_id: str,
+    challenge_id: str | None = None,
+    assessment_id: str | None = None,
+    invite_token: str | None = None,
+) -> dict[str, Any]:
     scenario = load_scenario(scenario_id)
     session_id = f"session_{uuid.uuid4().hex[:12]}"
-    create_session(session_id, candidate_id, scenario_id, challenge_id)
+    create_session(session_id, candidate_id, scenario_id, challenge_id, assessment_id, invite_token)
 
     problem_statement = scenario["problem_statement"]
     if challenge_id:
@@ -121,6 +128,11 @@ def handle_query(
     if session["status"] != "active":
         raise ValueError("Session is no longer active")
 
+    started_at = datetime.fromisoformat(session["started_at"])
+    elapsed = (datetime.now(timezone.utc) - started_at).total_seconds() / 60
+    if elapsed >= DEFAULT_TIME_LIMIT:
+        raise ValueError("Time limit exceeded")
+
     validate_agent(agent)
     history = get_query_history(session_id)
     result = route_query(
@@ -133,6 +145,8 @@ def handle_query(
     )
     planner = result.pop("_planner", None)
     attempts = result.pop("_attempts", None)
+    trace = result.pop("_trace", None)
+    llm_calls = result.pop("_llm_calls", None)
     query_log_id = log_query(
         session_id,
         agent,
@@ -143,6 +157,8 @@ def handle_query(
         warnings=result.get("warnings"),
         planner=planner,
         attempts=attempts,
+        trace=trace,
+        llm_calls=llm_calls,
     )
     log_session_event(
         session_id,
@@ -306,6 +322,7 @@ def get_session_status(session_id: str) -> dict[str, Any]:
     return {
         "session_id": session_id,
         "scenario_id": session["scenario_id"],
+        "status": session.get("status", "active"),
         "time_remaining_minutes": round(time_remaining, 1),
         "queries_made": get_queries_count(session_id),
         "saved_evidence_count": len(get_saved_evidence(session_id)),
@@ -334,3 +351,13 @@ def handle_get_score(session_id: str) -> dict[str, Any]:
     if result is None:
         raise ValueError(f"No scoring result for session: {session_id}")
     return result
+
+
+def handle_get_submission(session_id: str) -> dict[str, Any]:
+    session = get_session(session_id)
+    if session is None:
+        raise ValueError(f"Session not found: {session_id}")
+    submission = get_submission(session_id)
+    if submission is None:
+        raise ValueError(f"No submission found for session: {session_id}")
+    return submission

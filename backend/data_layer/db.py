@@ -251,8 +251,14 @@ FORBIDDEN_SQL_TOKENS = (
 
 
 def extract_referenced_tables(sql: str) -> set[str]:
-    """Extract likely table names from FROM/JOIN clauses."""
+    """Extract likely table names from FROM/JOIN clauses, excluding CTE names."""
     cleaned = re.sub(r"--.*?$|/\*.*?\*/", " ", sql, flags=re.MULTILINE | re.DOTALL)
+
+    # Extract CTE names defined in WITH ... AS (...) clauses so we can exclude them
+    cte_names: set[str] = set()
+    for cte_match in re.finditer(r"\b(\w+)\s+AS\s*\(", cleaned, flags=re.IGNORECASE):
+        cte_names.add(cte_match.group(1).lower())
+
     refs = set()
     for match in re.finditer(r"\b(?:from|join)\s+([^\s,()]+)", cleaned, flags=re.IGNORECASE):
         token = match.group(1).strip()
@@ -261,6 +267,8 @@ def extract_referenced_tables(sql: str) -> set[str]:
             token = token.split(".")[-1]
         lowered = token.lower()
         if lowered in {"select"}:
+            continue
+        if lowered in cte_names:
             continue
         refs.add(token)
     return refs

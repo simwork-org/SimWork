@@ -35,6 +35,8 @@ downloads/
 eggs/
 .eggs/
 lib/
+!frontend/src/lib/
+!frontend/src/lib/**
 lib64/
 parts/
 sdist/
@@ -174,7 +176,7 @@ env.bak/
 venv.bak/
 
 # Local-only working notes and reference material
-.local/
+local/
 
 # Local secrets / certs
 *.pem
@@ -250,3 +252,6 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# ignore .local
+.local/

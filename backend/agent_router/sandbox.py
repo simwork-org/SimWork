@@ -7,6 +7,8 @@ thread-based timeout, and result extraction.
 
 from __future__ import annotations
 
+import ast
+import builtins
 import re
 import threading
 from typing import Any
@@ -17,7 +19,6 @@ import pandas as pd
 # ── Static validation ────────────────────────────────────────────────
 
 _FORBIDDEN_PATTERNS: list[tuple[str, str]] = [
-    (r"\bimport\s", "import statements"),
     (r"\b__import__\b", "__import__"),
     (r"\bimportlib\b", "importlib"),
     (r"\bopen\s*\(", "open()"),
@@ -48,11 +49,40 @@ _FORBIDDEN_PATTERNS: list[tuple[str, str]] = [
     (r"\bread_pickle\b", "read_pickle"),
 ]
 
+_ALLOWED_IMPORT_ROOTS = {"pandas", "numpy"}
+
+
+def _validate_imports(code: str) -> tuple[bool, str | None]:
+    try:
+        tree = ast.parse(code)
+    except SyntaxError as exc:
+        return False, f"Syntax error: {exc.msg}"
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                root = alias.name.split(".", 1)[0]
+                if root not in _ALLOWED_IMPORT_ROOTS:
+                    return False, f"Forbidden import: {alias.name}"
+        elif isinstance(node, ast.ImportFrom):
+            module = node.module or ""
+            root = module.split(".", 1)[0]
+            if root not in _ALLOWED_IMPORT_ROOTS:
+                return False, f"Forbidden import: {module or 'relative import'}"
+            if node.level:
+                return False, "Relative imports are not allowed"
+
+    return True, None
+
 
 def validate_pandas_code(code: str) -> tuple[bool, str | None]:
     """Static validation of pandas code. Returns (is_valid, error_message)."""
     if not code or not code.strip():
         return False, "Empty code"
+
+    imports_valid, import_error = _validate_imports(code)
+    if not imports_valid:
+        return False, import_error
 
     for pattern, description in _FORBIDDEN_PATTERNS:
         if re.search(pattern, code):
@@ -88,6 +118,20 @@ _SAFE_BUILTINS = {
     "False": False,
     "None": None,
 }
+
+
+def _safe_import(name: str, globals: dict[str, Any] | None = None, locals: dict[str, Any] | None = None, fromlist: tuple[str, ...] = (), level: int = 0):
+    if level:
+        raise ImportError("Relative imports are not allowed")
+
+    root = name.split(".", 1)[0]
+    if root not in _ALLOWED_IMPORT_ROOTS:
+        raise ImportError(f"Import of '{name}' is not allowed")
+
+    return builtins.__import__(name, globals, locals, fromlist, level)
+
+
+_SAFE_BUILTINS["__import__"] = _safe_import
 
 
 def execute_pandas_code(

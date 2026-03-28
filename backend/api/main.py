@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+import logging
 import os
 from pathlib import Path
 
@@ -17,18 +19,54 @@ if _env_path.exists():
 
 from fastapi import FastAPI  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+from fastapi.responses import JSONResponse  # noqa: E402
 
 from api.routes import router  # noqa: E402
-from investigation_logger.logger import clear_all_session_data, init_db  # noqa: E402
+from investigation_logger.logger import init_db, close_pool, check_db  # noqa: E402
+
+logger = logging.getLogger(__name__)
+
+_LLM_KEY_MAP = {
+    "openai": "OPENAI_API_KEY",
+    "anthropic": "ANTHROPIC_API_KEY",
+    "deepseek": "DEEPSEEK_API_KEY",
+}
+
+
+def _validate_env() -> None:
+    """Log warnings for missing critical environment variables."""
+    missing = []
+    if not os.environ.get("DATABASE_URL"):
+        missing.append("DATABASE_URL")
+    if not os.environ.get("GOOGLE_CLIENT_ID"):
+        missing.append("GOOGLE_CLIENT_ID")
+    provider = os.environ.get("LLM_PROVIDER", "ollama")
+    key_name = _LLM_KEY_MAP.get(provider)
+    if key_name and not os.environ.get(key_name):
+        missing.append(key_name)
+    if missing:
+        logger.warning("Missing environment variables: %s", ", ".join(missing))
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    _validate_env()
+    init_db()
+    logger.info("SimWork API started — database initialized")
+    yield
+    close_pool()
+    logger.info("SimWork API shutting down — database pool closed")
 
 app = FastAPI(
     title="SimWork API",
     description="Simulation platform for evaluating investigation and decision-making skills",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 # CORS
-origins = os.environ.get("CORS_ORIGINS", "http://localhost:3000").split(",")
+default_origins = "http://localhost:3000,http://127.0.0.1:3000"
+origins = os.environ.get("CORS_ORIGINS", default_origins).split(",")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in origins],
@@ -40,12 +78,9 @@ app.add_middleware(
 app.include_router(router)
 
 
-@app.on_event("startup")
-def on_startup():
-    init_db()
-    clear_all_session_data()
-
-
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    db_ok = check_db()
+    status = "ok" if db_ok else "degraded"
+    code = 200 if db_ok else 503
+    return JSONResponse({"status": status, "database": db_ok}, status_code=code)

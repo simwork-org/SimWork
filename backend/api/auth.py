@@ -6,11 +6,11 @@ import os
 import logging
 from typing import Any
 
-from fastapi import HTTPException, Request
+from fastapi import Depends, HTTPException, Request
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 
-from investigation_logger.logger import upsert_user
+from investigation_logger.logger import get_user, upsert_user
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +20,7 @@ _google_transport = google_requests.Request()
 
 
 def get_current_user(request: Request) -> dict[str, Any]:
-    """FastAPI dependency — verify Google ID token and return user info."""
+    """FastAPI dependency — verify Google ID token and return user info including role."""
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Not authenticated")
@@ -40,6 +40,24 @@ def get_current_user(request: Request) -> dict[str, Any]:
     name = idinfo.get("name")
     picture = idinfo.get("picture")
 
-    upsert_user(user_id, email, name, picture)
+    # Check if user already exists to preserve their role
+    existing = get_user(user_id)
+    role = existing.get("role", "candidate") if existing else None
 
-    return {"user_id": user_id, "email": email, "name": name, "picture": picture}
+    upsert_user(user_id, email, name, picture, role=role)
+
+    # Re-fetch to get the definitive role from DB
+    if not existing:
+        existing = get_user(user_id)
+    final_role = existing.get("role", "candidate") if existing else "candidate"
+
+    return {"user_id": user_id, "email": email, "name": name, "picture": picture, "role": final_role}
+
+
+def require_role(role: str):
+    """FastAPI dependency factory — restrict endpoint to users with a specific role."""
+    def dependency(user: dict[str, Any] = Depends(get_current_user)) -> dict[str, Any]:
+        if user.get("role") != role:
+            raise HTTPException(status_code=403, detail="Insufficient permissions")
+        return user
+    return dependency
